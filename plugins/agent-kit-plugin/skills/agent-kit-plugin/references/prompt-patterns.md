@@ -37,8 +37,8 @@ Include context information when relevant:
 const transferHbarPrompt = (context: Context = {}) => {
   // Build context snippet
   let contextSnippet = '';
-  if (context.operatorAccountId) {
-    contextSnippet = `Current operator account: ${context.operatorAccountId}\n\n`;
+  if (context.accountId) {
+    contextSnippet = `Current operator account: ${context.accountId}\n\n`;
   }
 
   return `${contextSnippet}This tool transfers HBAR between accounts on Hedera.
@@ -52,19 +52,21 @@ Parameters:
 
 ## Scheduled Transaction Prompts
 
-When tools support scheduled transactions:
+Scheduling is opt-in **per call** via the `schedulingParams` object on the tool's parameters — the prompt should describe it whenever the tool wires that field into its Zod schema (see `references/zod-schema-patterns.md`):
 
 ```typescript
-const createTokenPrompt = (context: Context = {}) => {
-  const scheduledParams = context.mode === 'scheduled' ? `
-- scheduleMemo (str, optional): Memo for the scheduled transaction
-- schedulePayerAccountId (str, optional): Account to pay for scheduled execution` : '';
-
+const createTokenPrompt = (_context: Context = {}) => {
   return `This tool creates a fungible token on Hedera.
 Parameters:
 - tokenName (str, required): The name of the token
 - tokenSymbol (str, optional): The symbol of the token
-- initialSupply (int, optional): Initial supply, defaults to 0${scheduledParams}`;
+- initialSupply (int, optional): Initial supply, defaults to 0
+- schedulingParams (object, optional): Submit as a scheduled transaction. Fields:
+    - isScheduled (bool, optional): Wrap the transaction in a Schedule. Defaults to false
+    - adminKey (string|bool, optional): Admin key for the schedule
+    - payerAccountId (str, optional): Account that pays for scheduled execution
+    - expirationTime (str, optional): ISO timestamp the schedule expires at
+    - waitForExpiry (bool, optional): Defer execution until expirationTime`;
 };
 ```
 
@@ -179,28 +181,27 @@ Returns the result of the contract call.`;
 Use utility functions for consistent prompts:
 
 ```typescript
-// Utility class pattern from hedera-agent-kit
+// Utility class pattern
 class PromptGenerator {
   static getContextSnippet(context: Context = {}): string {
-    if (!context.operatorAccountId) return '';
-    return `Current operator account: ${context.operatorAccountId}\n\n`;
+    if (!context.accountId) return '';
+    return `Current operator account: ${context.accountId}\n\n`;
   }
 
   static getAccountParameterDescription(
     paramName: string,
     context: Context = {}
   ): string {
-    const defaultNote = context.operatorAccountId
-      ? ` Defaults to operator account (${context.operatorAccountId})`
+    const defaultNote = context.accountId
+      ? ` Defaults to operator account (${context.accountId})`
       : ' Defaults to operator account';
     return `${paramName} (str, optional): Account ID.${defaultNote}`;
   }
 
-  static getScheduledTransactionParamsDescription(context: Context = {}): string {
-    if (context.mode !== 'scheduled') return '';
+  static getSchedulingParamsDescription(): string {
     return `
-- scheduleMemo (str, optional): Memo for the scheduled transaction
-- schedulePayerAccountId (str, optional): Account to pay for scheduled execution`;
+- schedulingParams (object, optional): If set, submits the transaction as scheduled. Supports
+  isScheduled, adminKey, payerAccountId, expirationTime, waitForExpiry`;
   }
 
   static getParameterUsageInstructions(): string {

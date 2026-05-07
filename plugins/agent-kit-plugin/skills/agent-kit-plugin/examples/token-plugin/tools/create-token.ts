@@ -6,9 +6,14 @@
  */
 
 import { z } from 'zod';
-import { Client, Status, TokenCreateTransaction, TokenType, TokenSupplyType } from '@hashgraph/sdk';
-import { Context, Tool } from 'hedera-agent-kit';
-import { handleTransaction, RawTransactionResponse, transactionToolOutputParser } from 'hedera-agent-kit';
+import { Client, Status, TokenCreateTransaction, TokenType, TokenSupplyType } from '@hiero-ledger/sdk';
+import {
+  BaseTool,
+  Context,
+  handleTransaction,
+  RawTransactionResponse,
+  transactionToolOutputParser,
+} from '@hashgraph/hedera-agent-kit';
 
 /**
  * Tool name constant
@@ -16,24 +21,18 @@ import { handleTransaction, RawTransactionResponse, transactionToolOutputParser 
 export const CREATE_TOKEN_TOOL = 'create_token_tool';
 
 /**
- * Prompt function with context awareness
+ * Prompt function with context awareness.
  *
  * The prompt tells the AI agent:
- * - What this tool does
- * - What parameters it accepts
- * - Parameter types and requirements
+ * - what this tool does
+ * - what parameters it accepts
+ * - parameter types and requirements
  */
 const createTokenPrompt = (context: Context = {}) => {
-  // Add context snippet if operator is known
   let contextSnippet = '';
-  if (context.operatorAccountId) {
-    contextSnippet = `Current operator account: ${context.operatorAccountId}\n\n`;
+  if (context.accountId) {
+    contextSnippet = `Current operator account: ${context.accountId}\n\n`;
   }
-
-  // Add scheduled transaction params if in scheduled mode
-  const scheduledParams = context.mode === 'scheduled' ? `
-- scheduleMemo (str, optional): Memo for the scheduled transaction
-- schedulePayerAccountId (str, optional): Account to pay for scheduled execution` : '';
 
   return `${contextSnippet}This tool creates a fungible token on Hedera.
 Parameters:
@@ -43,21 +42,21 @@ Parameters:
 - decimals (int, optional): Decimal places (0-18), defaults to 0
 - supplyType (str, optional): "finite" or "infinite", defaults to "infinite"
 - maxSupply (int, optional): Maximum supply (required if supplyType is "finite")
-- treasuryAccountId (str, optional): Treasury account, defaults to operator${scheduledParams}
+- treasuryAccountId (str, optional): Treasury account, defaults to operator
 
 Note: Token IDs are returned in format X.X.X (e.g., 0.0.12345)`;
 };
 
 /**
- * Parameter schema using Zod
+ * Parameter schema using Zod.
  *
  * This schema:
- * - Validates input at runtime
- * - Provides TypeScript types
- * - Describes fields for the AI agent
+ * - validates input at runtime
+ * - provides TypeScript types via `z.infer`
+ * - describes fields for the AI agent (via `.describe()`)
  */
-const createTokenParameters = (context: Context = {}) => {
-  const baseSchema = z.object({
+const createTokenParameters = (_context: Context = {}) => {
+  return z.object({
     tokenName: z.string()
       .describe('The name of the token'),
     tokenSymbol: z.string()
@@ -73,28 +72,23 @@ const createTokenParameters = (context: Context = {}) => {
     treasuryAccountId: z.string().optional()
       .describe('Treasury account ID, defaults to operator'),
   });
+};
 
-  // Extend with scheduled transaction params if needed
-  if (context.mode === 'scheduled') {
-    return baseSchema.extend({
-      scheduleMemo: z.string().optional()
-        .describe('Memo for scheduled transaction'),
-      schedulePayerAccountId: z.string().optional()
-        .describe('Payer for scheduled transaction'),
-    });
-  }
+type CreateTokenParams = z.infer<ReturnType<typeof createTokenParameters>>;
 
-  return baseSchema;
+/**
+ * Normalised params have every default resolved — coreAction can rely on a
+ * concrete `treasuryAccountId` and never has to reach back to the client.
+ */
+type NormalisedCreateTokenParams = CreateTokenParams & {
+  treasuryAccountId: string;
 };
 
 /**
- * Post-process function
- *
- * Formats the transaction result into a human-readable message.
- * Handles both direct and scheduled transaction results.
+ * Post-process function — the agent kit sets `scheduleId` automatically when
+ * the call was wrapped in a Schedule (via `schedulingParams` on the request).
  */
 const postProcess = (response: RawTransactionResponse): string => {
-  // Handle scheduled transactions
   if (response.scheduleId) {
     return `Scheduled token creation transaction created.
 Transaction ID: ${response.transactionId}
@@ -103,7 +97,6 @@ Schedule ID: ${response.scheduleId.toString()}
 The token will be created when the scheduled transaction is executed.`;
   }
 
-  // Handle direct transactions
   const tokenIdStr = response.tokenId
     ? response.tokenId.toString()
     : 'unknown';
@@ -116,36 +109,52 @@ You can now use this token ID for transfers, minting, and other operations.`;
 };
 
 /**
- * Execute function
- *
- * Performs the actual token creation on Hedera.
- * Uses handleTransaction for consistent execution and error handling.
+ * BaseTool subclass — drives the 7-stage lifecycle (preToolExecutionHook →
+ * normalizeParams → postParamsNormalizationHook → coreAction → postCoreActionHook
+ * → secondaryAction → postToolExecutionHook). Hooks/policies registered on the
+ * agent kit fire automatically at the surrounding stages.
  */
-const createToken = async (
-  client: Client,
-  context: Context,
-  params: z.infer<ReturnType<typeof createTokenParameters>>,
-) => {
-  try {
-    // Get operator account for treasury default
-    const operatorId = client.operatorAccountId;
-    if (!operatorId) {
-      return {
-        raw: { error: 'No operator account configured' },
-        humanMessage: 'Error: No operator account configured on the client',
-      };
-    }
+export class CreateTokenTool extends BaseTool<CreateTokenParams, NormalisedCreateTokenParams> {
+  method = CREATE_TOKEN_TOOL;
+  name = 'Create Fungible Token';
+  description: string;
+  parameters: ReturnType<typeof createTokenParameters>;
+  outputParser = transactionToolOutputParser;
 
-    // Build token create transaction
+  constructor(context: Context) {
+    super();
+    this.description = createTokenPrompt(context);
+    this.parameters = createTokenParameters(context);
+  }
+
+  // Stage 2 — resolve defaults that depend on the client/context.
+  async normalizeParams(
+    params: CreateTokenParams,
+    _context: Context,
+    client: Client,
+  ): Promise<NormalisedCreateTokenParams> {
+    const operatorId = client.operatorAccountId;
+    const treasury = params.treasuryAccountId ?? operatorId?.toString();
+    if (!treasury) {
+      throw new Error('No operator account configured and no treasuryAccountId supplied');
+    }
+    return { ...params, treasuryAccountId: treasury };
+  }
+
+  // Stage 4 — build the transaction (no signing/submission yet).
+  async coreAction(
+    params: NormalisedCreateTokenParams,
+    _context: Context,
+    _client: Client,
+  ): Promise<TokenCreateTransaction> {
     const tx = new TokenCreateTransaction()
       .setTokenName(params.tokenName)
       .setTokenSymbol(params.tokenSymbol)
       .setTokenType(TokenType.FungibleCommon)
       .setDecimals(params.decimals ?? 0)
       .setInitialSupply(params.initialSupply ?? 0)
-      .setTreasuryAccountId(params.treasuryAccountId ?? operatorId);
+      .setTreasuryAccountId(params.treasuryAccountId);
 
-    // Set supply type
     if (params.supplyType === 'finite') {
       tx.setSupplyType(TokenSupplyType.Finite);
       if (params.maxSupply) {
@@ -155,32 +164,32 @@ const createToken = async (
       tx.setSupplyType(TokenSupplyType.Infinite);
     }
 
-    // Execute transaction using the standard handler
-    return await handleTransaction(tx, client, context, postProcess);
-  } catch (error) {
-    const desc = 'Failed to create token';
-    const message = desc + (error instanceof Error ? `: ${error.message}` : '');
+    return tx;
+  }
+
+  // Stage 6 — sign and submit the transaction.
+  async secondaryAction(
+    transaction: TokenCreateTransaction,
+    client: Client,
+    context: Context,
+  ) {
+    return handleTransaction(transaction, client, context, postProcess);
+  }
+
+  // Custom error formatter — overriding the default lets us tag logs with the tool name.
+  async handleError(error: unknown, _context: Context) {
+    const message = 'Failed to create token' + (error instanceof Error ? `: ${error.message}` : '');
     console.error('[create_token_tool]', message);
     return {
       raw: { status: Status.InvalidTransaction, error: message },
       humanMessage: message,
     };
   }
-};
+}
 
 /**
- * Tool factory function
- *
- * Returns the complete tool definition with all components.
- * Uses transactionToolOutputParser for mutation tools.
+ * Tool factory — returns a BaseTool instance, accepted everywhere a Tool is.
  */
-const tool = (context: Context): Tool => ({
-  method: CREATE_TOKEN_TOOL,
-  name: 'Create Fungible Token',
-  description: createTokenPrompt(context),
-  parameters: createTokenParameters(context),
-  execute: createToken,
-  outputParser: transactionToolOutputParser,
-});
+const tool = (context: Context): BaseTool => new CreateTokenTool(context);
 
 export default tool;

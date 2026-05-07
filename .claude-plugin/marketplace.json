@@ -9,14 +9,14 @@
   "plugins": [
     {
       "name": "agent-kit-plugin",
-      "description": "Comprehensive guide for creating custom plugins that extend the Hedera Agent Kit with new tools for network interactions",
-      "version": "1.0.0",
+      "description": "Comprehensive guides for extending the Hedera Agent Kit: creating BaseTool plugins, writing observation hooks, and writing blocking policies",
+      "version": "2.0.0",
       "author": {
         "name": "Hedera Dev"
       },
       "source": "./plugins/agent-kit-plugin",
       "category": "development",
-      "keywords": ["hedera", "agent-kit", "plugin", "tools", "blockchain"]
+      "keywords": ["hedera", "agent-kit", "plugin", "tools", "hooks", "policies", "blockchain"]
     },
     {
       "name": "system-contracts",

@@ -25,8 +25,7 @@ export interface Plugin {
 ### Example Plugin Definition
 
 ```typescript
-import { Context } from 'hedera-agent-kit';
-import { Plugin } from 'hedera-agent-kit';
+import { Context, Plugin } from '@hashgraph/hedera-agent-kit';
 import createTokenTool, { CREATE_TOKEN_TOOL } from './tools/tokens/create-token';
 import getTokenInfoTool, { GET_TOKEN_INFO_TOOL } from './tools/queries/get-token-info';
 
@@ -79,7 +78,7 @@ export type Tool = {
 
 ```typescript
 execute: (
-  client: Client,      // Hedera SDK client instance
+  client: Client,      // Hedera SDK client (@hiero-ledger/sdk)
   context: Context,    // Configuration context (network, mode, services)
   params: any          // Validated parameters matching Zod schema
 ) => Promise<{
@@ -97,88 +96,218 @@ outputParser: (rawOutput: string) => {
 }
 ```
 
+## `BaseTool`
+
+`BaseTool` is an abstract class that **implements** the `Tool` interface. Any class extending `BaseTool` is accepted everywhere a `Tool` is expected — including inside `Plugin.tools()`. It enforces a 7-stage lifecycle and is the only way to opt into the hooks and policies system (`HcsAuditTrailHook`, `MaxRecipientsPolicy`, `RejectToolPolicy`, etc.).
+
+### Lifecycle stages
+
+```text
+[1] preToolExecutionHook
+[2] normalizeParams        ← your logic
+[3] postParamsNormalizationHook
+[4] coreAction             ← your logic
+[5] postCoreActionHook
+[6] secondaryAction        ← your logic (optional, e.g. tx signing/submission)
+[7] postToolExecutionHook
+```
+
+Hooks and policies tap into stages 1, 3, 5, and 7 automatically — you never call them manually.
+
+### Mutation-tool example
+
+```typescript
+import { z } from 'zod';
+import { Client, Status } from '@hiero-ledger/sdk';
+import {
+  BaseTool,
+  Context,
+  handleTransaction,
+  RawTransactionResponse,
+  transactionToolOutputParser,
+} from '@hashgraph/hedera-agent-kit';
+
+export const TRANSFER_HBAR_TOOL = 'transfer_hbar_tool';
+
+const transferHbarPrompt = (_context: Context = {}) => `...`;
+const transferHbarParameters = (_context: Context = {}) => z.object({
+  toAccountId: z.string(),
+  amount: z.number().positive(),
+});
+
+const postProcess = (response: RawTransactionResponse) =>
+  `HBAR transferred. Transaction ID: ${response.transactionId}`;
+
+export class TransferHbarTool extends BaseTool {
+  method = TRANSFER_HBAR_TOOL;
+  name = 'Transfer HBAR';
+  description: string;
+  parameters: ReturnType<typeof transferHbarParameters>;
+  outputParser = transactionToolOutputParser;
+
+  constructor(context: Context) {
+    super();
+    this.description = transferHbarPrompt(context);
+    this.parameters = transferHbarParameters(context);
+  }
+
+  // Stage 2
+  async normalizeParams(params: any, _context: Context, _client: Client) {
+    return params; // call your normaliser here
+  }
+
+  // Stage 4 — build the transaction, do not sign/submit yet
+  async coreAction(normalisedParams: any, _context: Context, _client: Client) {
+    // return a built Transaction
+    return /* HederaBuilder.transferHbar(normalisedParams) */ undefined as any;
+  }
+
+  // Stage 6 — sign & submit
+  async secondaryAction(transaction: any, client: Client, context: Context) {
+    return await handleTransaction(transaction, client, context, postProcess);
+  }
+
+  async handleError(error: unknown, _context: Context) {
+    const message = 'Failed to transfer HBAR' + (error instanceof Error ? `: ${error.message}` : '');
+    console.error('[transfer_hbar_tool]', message);
+    return { raw: { status: Status.InvalidTransaction, error: message }, humanMessage: message };
+  }
+}
+
+const tool = (context: Context): BaseTool => new TransferHbarTool(context);
+export default tool;
+```
+
+### Query-tool variant — skip stage 6
+
+For read-only tools, override `shouldSecondaryAction` so the lifecycle stops after `coreAction`:
+
+```typescript
+export class MyQueryTool extends BaseTool {
+  // ...
+  async coreAction(params: any, _context: Context, client: Client) {
+    return await someHederaQuery(params, client);
+  }
+
+  async shouldSecondaryAction(_coreActionResult: any, _context: Context) {
+    return false;
+  }
+
+  // Still required by the abstract class — provide a no-op
+  async secondaryAction(result: any, _client: Client, _context: Context) {
+    return result;
+  }
+}
+```
+
 ## Context Interface
 
 The Context object provides configuration and services to tools:
 
 ```typescript
-export interface Context {
-  network?: 'mainnet' | 'testnet' | 'previewnet';
-  mode?: 'direct' | 'scheduled';
-  mirrornodeService?: MirrornodeService;
-  operatorAccountId?: string;
-  // Additional configuration...
-}
+import { AgentMode, IHederaMirrornodeService, AbstractHook } from '@hashgraph/hedera-agent-kit';
+
+export type Context = {
+  accountId?: string;
+  accountPublicKey?: string;
+  mode?: AgentMode;                            // AgentMode.AUTONOMOUS | AgentMode.RETURN_BYTES
+  mirrornodeService?: IHederaMirrornodeService;
+  hooks?: AbstractHook[];
+};
 ```
 
 ### Common Context Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `network` | `string` | Target Hedera network |
-| `mode` | `string` | Transaction mode (direct execution or scheduled) |
-| `mirrornodeService` | `object` | Service for querying mirror node |
-| `operatorAccountId` | `string` | The account ID executing transactions |
+| `accountId` | `string` | Operator account ID currently signing transactions |
+| `accountPublicKey` | `string` | Public key of the operator account |
+| `mode` | `AgentMode` | `AUTONOMOUS` (sign and submit) or `RETURN_BYTES` (return signed bytes for the caller to submit) |
+| `mirrornodeService` | `IHederaMirrornodeService` | Service for querying the mirror node |
+| `hooks` | `AbstractHook[]` | Hooks dispatched around the `BaseTool` lifecycle |
 
-## PluginRegistry Class
+> **Scheduled transactions.** Scheduling is opted into **per-tool**: tools that support scheduling expose a `schedulingParams` object on their Zod parameters (with fields like `isScheduled`, `adminKey`, `payerAccountId`, `expirationTime`, `waitForExpiry`). Built-in plugins already wire this in; for custom tools, see the scheduling pattern in `references/zod-schema-patterns.md`.
 
-Register and manage plugins:
+## Registering Plugins with a Toolkit
 
-```typescript
-export class PluginRegistry {
-  register(plugin: Plugin): void;
-  getPlugins(): Plugin[];
-  getTools(context: Context): Tool[];
-  clear(): void;
-}
-```
+Plugins are passed directly to the toolkit's `configuration.plugins` array. **An empty array means the agent has no tools.**
 
-### Methods
+Pick the toolkit package matching your framework:
 
-| Method | Description |
-|--------|-------------|
-| `register(plugin)` | Add a plugin to the registry |
-| `getPlugins()` | Get all registered plugins |
-| `getTools(context)` | Get all tools from all plugins with context applied |
-| `clear()` | Remove all registered plugins |
+| Framework | Toolkit package |
+|---|---|
+| LangChain | `@hashgraph/hedera-agent-kit-langchain` |
+| Vercel AI SDK | `@hashgraph/hedera-agent-kit-ai-sdk` |
+| ElizaOS | `@hashgraph/hedera-agent-kit-elizaos` |
+| MCP | `@hashgraph/hedera-agent-kit-mcp` |
 
-### Usage Example
+### LangChain example
 
 ```typescript
-import { PluginRegistry } from 'hedera-agent-kit';
+import { Client, PrivateKey } from '@hiero-ledger/sdk';
+import { AgentMode } from '@hashgraph/hedera-agent-kit';
+import { coreTokenPlugin, coreAccountPlugin } from '@hashgraph/hedera-agent-kit/plugins';
+import { HederaLangchainToolkit } from '@hashgraph/hedera-agent-kit-langchain';
 import { myTokenPlugin } from './my-token-plugin';
-import { myAccountPlugin } from './my-account-plugin';
 
-const registry = new PluginRegistry();
+const client = Client.forTestnet().setOperator(
+  process.env.ACCOUNT_ID!,
+  PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY!),
+);
 
-// Register plugins
-registry.register(myTokenPlugin);
-registry.register(myAccountPlugin);
+const toolkit = new HederaLangchainToolkit({
+  client,
+  configuration: {
+    plugins: [coreTokenPlugin, coreAccountPlugin, myTokenPlugin], // explicit, required
+    context: { mode: AgentMode.AUTONOMOUS },
+  },
+});
 
-// Get all tools for use with an AI agent
-const context: Context = {
-  network: 'testnet',
-  mode: 'direct',
-};
-const tools = registry.getTools(context);
-
-// Tools array contains all tools from all registered plugins
+const tools = toolkit.getTools();
 console.log(`Loaded ${tools.length} tools`);
 ```
 
+### Loading every built-in core plugin at once
+
+```typescript
+import { allCorePlugins } from '@hashgraph/hedera-agent-kit/plugins';
+// ...
+plugins: [...allCorePlugins, myTokenPlugin],
+```
+
+### Available built-in plugins
+
+```typescript
+import {
+  coreAccountPlugin,
+  coreTokenPlugin,
+  coreConsensusPlugin,
+  coreEVMPlugin,
+  coreAccountQueryPlugin,
+  coreTokenQueryPlugin,
+  coreConsensusQueryPlugin,
+  coreEVMQueryPlugin,
+  coreMiscQueriesPlugin,
+  coreTransactionQueryPlugin,
+  allCorePlugins,
+} from '@hashgraph/hedera-agent-kit/plugins';
+```
+
 ## Built-in Output Parsers
+
+Set `outputParser` as a property on your `BaseTool` subclass.
 
 ### transactionToolOutputParser
 
 For mutation tools that execute transactions:
 
 ```typescript
-import { transactionToolOutputParser } from 'hedera-agent-kit';
+import { BaseTool, transactionToolOutputParser } from '@hashgraph/hedera-agent-kit';
 
-const tool = (context: Context): Tool => ({
-  // ... other fields
-  outputParser: transactionToolOutputParser,
-});
+export class CreateTokenTool extends BaseTool</* ... */> {
+  outputParser = transactionToolOutputParser;
+  // ...
+}
 ```
 
 ### untypedQueryOutputParser
@@ -186,31 +315,54 @@ const tool = (context: Context): Tool => ({
 For query tools that read data:
 
 ```typescript
-import { untypedQueryOutputParser } from 'hedera-agent-kit';
+import { BaseTool, untypedQueryOutputParser } from '@hashgraph/hedera-agent-kit';
 
-const tool = (context: Context): Tool => ({
-  // ... other fields
-  outputParser: untypedQueryOutputParser,
-});
+export class GetTokenInfoTool extends BaseTool</* ... */> {
+  outputParser = untypedQueryOutputParser;
+  // ...
+}
+```
+
+## Plugin Author `package.json`
+
+If you publish a plugin, declare the core package and the SDK as peer dependencies:
+
+```json
+{
+  "peerDependencies": {
+    "@hashgraph/hedera-agent-kit": "^4.0.0",
+    "@hiero-ledger/sdk": "^2.83.0"
+  }
+}
 ```
 
 ## Type Imports Summary
 
 ```typescript
-// Core interfaces
-import { Plugin } from 'hedera-agent-kit';
-import { Tool } from 'hedera-agent-kit';
-import { Context } from 'hedera-agent-kit';
-import { PluginRegistry } from 'hedera-agent-kit';
+// Core interfaces and helpers
+import {
+  Plugin,
+  Tool,
+  BaseTool,
+  Context,
+  AgentMode,
+  Configuration,
+  handleTransaction,
+  RawTransactionResponse,
+  transactionToolOutputParser,
+  untypedQueryOutputParser,
+} from '@hashgraph/hedera-agent-kit';
 
-// Transaction handling
-import { handleTransaction, RawTransactionResponse } from 'hedera-agent-kit';
+// Built-in plugins
+import {
+  coreAccountPlugin,
+  coreTokenPlugin,
+  allCorePlugins,
+  // ...
+} from '@hashgraph/hedera-agent-kit/plugins';
 
-// Output parsers
-import { transactionToolOutputParser, untypedQueryOutputParser } from 'hedera-agent-kit';
-
-// Hedera SDK types
-import { Client, Status } from '@hashgraph/sdk';
+// Hedera SDK
+import { Client, Status } from '@hiero-ledger/sdk';
 
 // Parameter validation
 import { z } from 'zod';
