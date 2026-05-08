@@ -49,11 +49,11 @@ Build a list of files to edit; do not start mutating yet.
 
 ### Step 2 — update `package.json`
 
-Replace dependencies, then run install. See `references/breaking-changes.md` § "Package mapping" for the complete table. Quick form:
+Replace dependencies, then run install. See `references/breaking-changes.md` § "Package mapping" for the complete table and § "Versioning" for version ranges. Quick form:
 
-- Remove: `hedera-agent-kit`, `@hashgraph/sdk`, `@langchain/core`, `langchain`, `@langchain/langgraph`, `ai` (the last four are now bundled in toolkit packages).
-- Add: `@hashgraph/hedera-agent-kit` and `@hiero-ledger/sdk` (mandatory), plus exactly one toolkit package depending on which framework the project uses.
-- Keep: the LLM provider (`@langchain/openai`, `@ai-sdk/openai`, `@langchain/anthropic`, etc.) — toolkits never bundle providers.
+- Remove: `hedera-agent-kit`, `@hashgraph/sdk`. Drop `@langchain/core`, `langchain`, `@langchain/langgraph`, `ai` **only if your code never imports from them directly** — they are transitive deps of the toolkit, so package managers with strict resolution (bun, pnpm) won't satisfy direct imports unless you keep them. When in doubt, keep them as devDeps.
+- Add: `@hashgraph/hedera-agent-kit` (use `^4.0.0`) and `@hiero-ledger/sdk` (use `^2.81.0`), plus exactly one toolkit package for your framework. **Toolkit packages are NOT on `^4`** — they re-baselined at `1.0.0` for this release. Use `^1.0.0` for `@hashgraph/hedera-agent-kit-langchain` / `-ai-sdk` / `-elizaos` / `-mcp`. Run `npm view <pkg> version` to confirm before pinning.
+- Keep: the LLM provider (`@langchain/openai`, `@ai-sdk/openai`, `@langchain/anthropic`, etc.) — toolkits never bundle providers. **LangChain consumers must also bump the provider package to its `1.x` line** (e.g. `@langchain/openai@^1`); the `0.x` line depends on `@langchain/core@^0.3` and produces dual-package type errors against the toolkit's `@langchain/core@^1`. See `references/breaking-changes.md` § "LangChain ecosystem bump".
 
 ### Step 3 — rewrite imports
 
@@ -142,9 +142,11 @@ The example under `examples/transfer-hbar-migration/` shows the full transformat
 
 After mutating files, run in this order:
 
-1. `npm install` — confirms `package.json` resolves.
-2. `tsc --noEmit` (or `npm run build`) — picks up missing imports and type drifts (e.g. `setTreasuryAccountId` complaining because a normalised type was not declared).
-3. Smoke-test the agent: instantiate the toolkit, list tools (`toolkit.getTools().length` must be > 0), invoke one tool end-to-end. **A passing build does not prove the migration worked** — the empty-plugins-array footgun is type-safe and silent.
+1. `npm install` (or `bun install` / `pnpm install`) — confirms `package.json` resolves. Watch for "no version matching X" errors; toolkit packages are on `^1`, not `^4`.
+2. `tsc --noEmit` (or `npm run build`) — picks up missing imports and type drifts (e.g. `setTreasuryAccountId` complaining because a normalised type was not declared, or `noImplicitOverride` complaining about a missing `override` keyword on `handleError` / `secondaryAction`).
+3. **For LangChain consumers**, type errors mentioning two different `@langchain/core` paths (one nested under your provider package, one nested under the toolkit) indicate a dual-package situation — the provider package is still on `0.x`. Bump it to `1.x` per Step 2.
+4. **For LangChain consumers**, errors like `Cannot find module 'langchain/agents'` or `'langchain/memory'` indicate the legacy `AgentExecutor`/`BufferMemory` pattern — these subpaths were removed in `langchain@1.x`. The fix is a separate framework migration to `createReactAgent` from `@langchain/langgraph/prebuilt`. See `references/breaking-changes.md` § "LangChain ecosystem bump".
+5. Smoke-test the agent: instantiate the toolkit, list tools (`toolkit.getTools().length` must be > 0), invoke one tool end-to-end. **A passing build does not prove the migration worked** — the empty-plugins-array footgun is type-safe and silent.
 
 ## What this skill does NOT cover
 
@@ -152,6 +154,7 @@ After mutating files, run in this order:
 - Native JS SDK changes inside `@hiero-ledger/sdk` itself — only the *import path* changes; the API surface remained stable across the rename.
 - Plugin authoring patterns from scratch — see the `agent-kit-plugin` skill.
 - Writing new hooks/policies — see `agent-kit-hook` and `agent-kit-policy` skills. Migration to `BaseTool` is the *prerequisite* for those features.
+- **LangChain framework migration** (`AgentExecutor` → `createReactAgent`, `BufferMemory` → `messages`-based history). The v4 LangChain toolkit forces a bump to `langchain@1.x`, which removes these APIs, but rewriting the agent setup is a LangChain-side concern. `references/breaking-changes.md` § "LangChain ecosystem bump" sketches the shape of the change; consult LangChain's own migration guide for details.
 
 ## Reference index
 

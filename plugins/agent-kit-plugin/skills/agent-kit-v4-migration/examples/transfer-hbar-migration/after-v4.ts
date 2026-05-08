@@ -88,12 +88,13 @@ export class TransferHbarTool extends BaseTool<TransferHbarParams> {
   }
 
   // Stage 6 — was the `handleTransaction(...)` call inside `execute`.
-  async secondaryAction(transaction: Transaction, client: Client, context: Context) {
+  override async secondaryAction(transaction: Transaction, client: Client, context: Context) {
     return handleTransaction(transaction, client, context, postProcess);
   }
 
   // Replaces the v3 try/catch block. Called from any failed stage.
-  async handleError(error: unknown, _context: Context) {
+  // `override` is required when `noImplicitOverride` is enabled in tsconfig.
+  override async handleError(error: unknown, _context: Context) {
     const desc = 'Failed to transfer HBAR';
     const message = desc + (error instanceof Error ? `: ${error.message}` : '');
     console.error('[transfer_hbar_tool]', message);

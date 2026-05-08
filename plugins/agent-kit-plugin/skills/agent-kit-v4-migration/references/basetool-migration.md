@@ -163,7 +163,9 @@ export class TransferHbarTool extends BaseTool<TransferHbarParams> {
   }
 
   // Single failure path — replaces the old try/catch in execute.
-  async handleError(error: unknown, _context: Context) {
+  // Use `override` — `handleError` is a concrete method on BaseTool and projects with
+  // `noImplicitOverride: true` (a common strict-TS setting) require the modifier.
+  override async handleError(error: unknown, _context: Context) {
     const message = 'Failed to transfer HBAR' + (error instanceof Error ? `: ${error.message}` : '');
     console.error('[transfer_hbar_tool]', message);
     return {
@@ -207,12 +209,12 @@ export class GetTokenInfoTool extends BaseTool<GetTokenInfoParams> {
   }
 
   // Skip stage 6 — pure query.
-  async shouldSecondaryAction() {
+  override async shouldSecondaryAction() {
     return false;
   }
 
   // Required by the abstract class but never invoked when shouldSecondaryAction is false.
-  async secondaryAction(result: any) {
+  override async secondaryAction(result: any) {
     return result;
   }
 }
@@ -269,7 +271,9 @@ These remain stable across the migration — do not rewrite them:
 ## Common pitfalls
 
 - **Forgetting `super()` in the constructor** — TypeScript will error; do not work around it by skipping the constructor entirely. Move all field initialisation back into `super()` plus assignments.
+- **Missing `override` modifier on overridden methods** — projects with `noImplicitOverride: true` (a common strict-TS setting; bun's default `tsconfig` enables strict mode in general) will reject overrides without the keyword. Apply `override` to every method that's concrete on the base class: `handleError`, `shouldSecondaryAction`, and the no-op `secondaryAction` in query tools. `normalizeParams` and `coreAction` are abstract and don't need it.
 - **Trying to call `preToolExecutionHook` / `postCoreActionHook` from inside the class** — those are dispatched by `BaseTool.execute()` based on the registered hooks/policies. Never invoke them manually.
-- **Returning the raw transaction from `secondaryAction` instead of calling `handleTransaction`** — the framework expects the `{ raw, humanMessage }` shape that `handleTransaction` produces.
+- **Returning the raw transaction from `secondaryAction` instead of calling `handleTransaction`** — for canonical mutation tools, the framework expects the `{ raw, humanMessage }` shape that `handleTransaction` produces. Tools that need custom mode dispatch (e.g. plugins that build EVM call data manually and want both AUTONOMOUS execution and a custom RETURN_BYTES path) can implement that logic directly in `secondaryAction` as long as the return value still matches `{ raw, humanMessage }`.
 - **Leaving the v3 `try/catch` inside `coreAction`** — it swallows errors that `handleError` should format. Move the catch to `handleError`.
+- **Throwing a string from `normalizeParams` instead of an `Error`** — v3 tools sometimes returned a user-friendly error message as a plain string. In v4, `normalizeParams` must return the normalised params or throw. Throw `new Error(message)` and format inside `handleError`.
 - **Leaving any tool as a `Tool` object literal** — every tool the plugin exports must extend `BaseTool`. Mixing v3-style and v4-style tools in the same plugin is unsupported.

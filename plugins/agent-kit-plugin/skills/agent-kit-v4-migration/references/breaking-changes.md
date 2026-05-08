@@ -162,15 +162,45 @@ The `hedera-agent-kit/elizaos` subpath no longer exists. ElizaOS is its own pack
 
 See `references/basetool-migration.md` for the mechanical conversion recipe and an annotated before/after.
 
+## 12. LangChain ecosystem bump (LangChain consumers only)
+
+`@hashgraph/hedera-agent-kit-langchain@1.x` pins `langchain@1.x` and `@langchain/core@1.x`. v3 LangChain consumers were typically on `langchain@0.3.x` / `@langchain/core@0.3.x`, which is a **major** version behind. Several consequences:
+
+- **Removed subpaths:** `langchain@1.x` no longer exports `langchain/agents` or `langchain/memory`. Code using `AgentExecutor`, `createToolCallingAgent`, or `BufferMemory` will fail to resolve.
+- **Replacement:** the `AgentExecutor` pattern is replaced by `createReactAgent` from `@langchain/langgraph/prebuilt` (LangGraph). Conversation history is now passed via the `messages` array on each invocation rather than a `BufferMemory` instance.
+- **Provider packages:** `@langchain/openai`, `@langchain/anthropic`, etc. must be bumped to their `1.x` line — the `0.x` versions depend on `@langchain/core@^0.3` and will produce dual-package type errors when mixed with the toolkit's `@langchain/core@^1`.
+- **Direct deps:** if your code imports from `langchain` or `@langchain/core` directly (rather than only through `@hashgraph/hedera-agent-kit-langchain`), keep them as direct deps so package managers with strict resolution (bun, pnpm) can resolve them. They can no longer be omitted just because the toolkit "bundles" them transitively.
+
+Sketch of the migration in a CLI/agent file:
+
+```diff
+- import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
+- import { BufferMemory } from 'langchain/memory';
++ import { createReactAgent } from '@langchain/langgraph/prebuilt';
+
+- const agent = createToolCallingAgent({ llm, tools, prompt });
+- const memory = new BufferMemory({ memoryKey: 'chat_history', returnMessages: true });
+- const executor = new AgentExecutor({ agent, tools, memory });
+- const result = await executor.invoke({ input });
++ const agent = createReactAgent({ llm, tools, prompt });
++ const result = await agent.invoke({ messages: [...history, { role: 'user', content: input }] });
+```
+
+This is a **separate framework migration** from the Hedera v4 migration, but it is forced by the toolkit's v4 release. AI SDK and ElizaOS toolkits do not have this issue.
+
 ## Versioning
 
-All packages in the `@hashgraph/hedera-agent-kit` family use **independent versioning with aligned major versions**:
+Packages in the `@hashgraph/hedera-agent-kit` family use **independent versioning**. Toolkit packages were re-baselined at `1.0.0` for the v4 release of the core kit; their major numbers do **not** track core.
 
-- Minor and patch versions may differ between packages.
-- Packages on the same major version are intended to work together.
+Look up the current version of each package on npm rather than guessing — `^4` for `@hashgraph/hedera-agent-kit-langchain` will fail to resolve.
 
-Example of a valid combination:
+Example of a working combination at the time of writing:
 
-- `@hashgraph/hedera-agent-kit@4.2.0`
-- `@hashgraph/hedera-agent-kit-langchain@4.5.1`
-- `@hashgraph/hedera-agent-kit-ai-sdk@4.1.3`
+- `@hashgraph/hedera-agent-kit@^4.0.0`
+- `@hashgraph/hedera-agent-kit-langchain@^1.0.0`
+- `@hashgraph/hedera-agent-kit-ai-sdk@^1.0.0`
+- `@hashgraph/hedera-agent-kit-elizaos@^1.0.0`
+- `@hashgraph/hedera-agent-kit-mcp@^1.0.0`
+- `@hiero-ledger/sdk@^2.81.0`
+
+When picking ranges for `package.json`, run `npm view <pkg> version` (or `npm view <pkg> versions`) for each toolkit package to confirm what's actually published — these numbers will drift over time.
