@@ -226,6 +226,8 @@ export type Context = {
 | `mirrornodeService` | `IHederaMirrornodeService` | Service for querying the mirror node |
 | `hooks` | `AbstractHook[]` | Hooks dispatched around the `BaseTool` lifecycle |
 
+> **`RETURN_BYTES` mode requires `accountId` and `accountPublicKey`.** In `RETURN_BYTES` the agent does not hold the operator key — it only assembles the transaction and hands the unsigned bytes to the caller. The agent therefore needs `accountId` and `accountPublicKey` on the `Context` to know **on whose behalf** the transaction is being built (payer, sender of a transfer, owner of a token, etc.). These two fields are **mandatory** in `RETURN_BYTES` mode; tools and built-in plugins read them when populating transaction fields.
+
 > **Scheduled transactions.** Scheduling is opted into **per-tool**: tools that support scheduling expose a `schedulingParams` object on their Zod parameters (with fields like `isScheduled`, `adminKey`, `payerAccountId`, `expirationTime`, `waitForExpiry`). Built-in plugins already wire this in; for custom tools, see the scheduling pattern in `references/zod-schema-patterns.md`.
 
 ## Registering Plugins with a Toolkit
