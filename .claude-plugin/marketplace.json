@@ -61,6 +61,17 @@
       "source": "./plugins/dev-intelligence",
       "category": "workflow",
       "keywords": ["dev-workflow", "session-management", "quality-gates", "scaffolding", "tech-debt", "claude-code", "ai-agents"]
+    },
+    {
+      "name": "hiero-cli",
+      "description": "Full hcli command reference for interacting with Hedera accounts, HBAR, tokens, topics, contracts, networks, credentials, batches, and plugin management",
+      "version": "1.0.0",
+      "author": {
+        "name": "Hedera Dev"
+      },
+      "source": "./plugins/hiero-cli",
+      "category": "development",
+      "keywords": ["hedera", "hiero", "hcli", "cli", "hbar", "token", "nft", "contract", "topic"]
     }
   ]
 }
