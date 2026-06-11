@@ -5,11 +5,10 @@
  * for Hedera Token Service operations.
  *
  * Install dependencies:
- *   npm install hedera-agent-kit @hashgraph/sdk zod
+ *   npm install @hashgraph/hedera-agent-kit @hiero-ledger/sdk zod
  */
 
-import { Context } from 'hedera-agent-kit';
-import { Plugin } from 'hedera-agent-kit';
+import { Context, Plugin } from '@hashgraph/hedera-agent-kit';
 import createTokenTool, { CREATE_TOKEN_TOOL } from './tools/create-token';
 import getTokenInfoTool, { GET_TOKEN_INFO_TOOL } from './tools/get-token-info';
 

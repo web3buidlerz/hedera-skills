@@ -167,11 +167,15 @@ recipient: z.union([
 
 ## Context-Aware Parameter Schemas
 
-Create schema factories that adapt to context:
+Schema factories receive `Context` so they can adapt the operator-account hint and other context-driven defaults in their `.describe()` text:
 
 ```typescript
 const createTokenParameters = (context: Context = {}) => {
-  const baseSchema = z.object({
+  const treasuryDescription = context.accountId
+    ? `Treasury account ID. Defaults to operator (${context.accountId})`
+    : 'Treasury account ID. Defaults to operator account';
+
+  return z.object({
     tokenName: z.string().describe('The name of the token'),
     tokenSymbol: z.string().optional().describe('The symbol of the token'),
     initialSupply: z.number().int().optional()
@@ -179,21 +183,34 @@ const createTokenParameters = (context: Context = {}) => {
     supplyType: z.enum(['finite', 'infinite']).optional()
       .describe('The supply type of the token'),
     treasuryAccountId: z.string().optional()
-      .describe('Treasury account ID. Defaults to operator account'),
+      .describe(treasuryDescription),
   });
-
-  // Add scheduled transaction parameters if mode supports it
-  if (context.mode === 'scheduled') {
-    return baseSchema.extend({
-      scheduleMemo: z.string().optional()
-        .describe('Memo for the scheduled transaction'),
-      schedulePayerAccountId: z.string().optional()
-        .describe('Payer for the scheduled transaction'),
-    });
-  }
-
-  return baseSchema;
 };
+```
+
+### Adding scheduling support
+
+Scheduling is opt-in **per call**. Tools that support scheduling expose a `schedulingParams` object on their parameters — the agent kit picks it up and wraps the transaction in a Schedule when present:
+
+```typescript
+const schedulingParamsSchema = z.object({
+  isScheduled: z.boolean().optional().default(false)
+    .describe('Wrap the transaction in a Schedule'),
+  adminKey: z.union([z.boolean(), z.string()]).optional().default(false)
+    .describe('Admin key for the schedule (true = use operator key, string = explicit public key)'),
+  payerAccountId: z.string().optional()
+    .describe('Account that pays for the scheduled execution'),
+  expirationTime: z.string().optional()
+    .describe('ISO timestamp when the schedule expires'),
+  waitForExpiry: z.boolean().optional().default(false)
+    .describe('Defer execution until expirationTime'),
+});
+
+const createTokenParametersWithScheduling = (context: Context = {}) =>
+  createTokenParameters(context).extend({
+    schedulingParams: schedulingParamsSchema.optional()
+      .describe('Optional. Submit as a scheduled transaction'),
+  });
 ```
 
 ## Common Schema Compositions

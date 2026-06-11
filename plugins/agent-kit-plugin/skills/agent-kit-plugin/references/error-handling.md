@@ -1,6 +1,6 @@
 # Error Handling and Output Parsing
 
-Patterns for handling errors and formatting tool output in Hedera plugins.
+Patterns for handling errors and formatting tool output in Hedera plugins. All tools extend `BaseTool` and centralise their failure path in `handleError` instead of wrapping every stage in a `try/catch`.
 
 ## Standard Response Structure
 
@@ -13,106 +13,71 @@ interface ToolResponse {
 }
 ```
 
-## Error Handling Pattern
+## How `BaseTool` handles errors
 
-### Basic Error Handling
+`BaseTool.execute()` runs the lifecycle and routes any thrown error through `handleError(error, context)`. The default implementation returns a generic structured failure; override it on your subclass to tag the log with the tool method and shape the `raw` payload.
 
 ```typescript
-const myToolExecute = async (
-  client: Client,
-  context: Context,
-  params: z.infer<ReturnType<typeof myToolParameters>>,
-) => {
-  try {
-    // Perform operation
-    const result = await performOperation(client, params);
-
-    return {
-      raw: result,
-      humanMessage: formatSuccess(result),
-    };
-  } catch (error) {
-    const desc = 'Failed to perform operation';
-    const message = desc + (error instanceof Error ? `: ${error.message}` : '');
-    console.error('[my_tool_name]', message);
-    return {
-      raw: { error: message },
-      humanMessage: message,
-    };
-  }
-};
+async handleError(error: unknown, _context: Context): Promise<ToolResponse> {
+  const message = 'Failed to perform operation' + (error instanceof Error ? `: ${error.message}` : '');
+  console.error('[my_tool_name]', message);
+  return { raw: { error: message }, humanMessage: message };
+}
 ```
 
-### With Status Code
+This means **`normalizeParams`, `coreAction`, and `secondaryAction` should `throw` on failure** — let `handleError` do the formatting once.
+
+### With Hedera SDK `Status` codes
 
 ```typescript
-import { Status } from '@hashgraph/sdk';
+import { Status } from '@hiero-ledger/sdk';
 
-const createTokenExecute = async (
-  client: Client,
-  context: Context,
-  params: CreateTokenParams,
-) => {
-  try {
-    const result = await createToken(client, params);
-    return {
-      raw: { status: Status.Success, tokenId: result.tokenId },
-      humanMessage: `Token created successfully. Token ID: ${result.tokenId}`,
-    };
-  } catch (error) {
-    const desc = 'Failed to create token';
-    const message = desc + (error instanceof Error ? `: ${error.message}` : '');
-    console.error('[create_token_tool]', message);
-    return {
-      raw: { status: Status.InvalidTransaction, error: message },
-      humanMessage: message,
-    };
-  }
-};
+async handleError(error: unknown, _context: Context) {
+  const message = 'Failed to create token' + (error instanceof Error ? `: ${error.message}` : '');
+  console.error('[create_token_tool]', message);
+  return {
+    raw: { status: Status.InvalidTransaction, error: message },
+    humanMessage: message,
+  };
+}
 ```
 
-### Specific Error Types
+### Validating preconditions early
+
+Throw inside `normalizeParams` or `coreAction` for known failure modes — `handleError` will format the response:
 
 ```typescript
-const transferExecute = async (
-  client: Client,
-  context: Context,
-  params: TransferParams,
-) => {
-  try {
-    // Validate account exists
-    const accountInfo = await getAccountInfo(params.toAccountId);
-    if (!accountInfo) {
-      return {
-        raw: { error: 'Account not found' },
-        humanMessage: `Account ${params.toAccountId} does not exist`,
-      };
-    }
+async normalizeParams(params: TransferParams, _context: Context, client: Client) {
+  const accountInfo = await getAccountInfo(params.toAccountId);
+  if (!accountInfo) {
+    throw new Error(`Account ${params.toAccountId} does not exist`);
+  }
 
-    // Check balance
-    const balance = await getBalance(client);
-    if (balance < params.amount) {
-      return {
-        raw: { error: 'Insufficient balance' },
-        humanMessage: `Insufficient balance. Have ${balance}, need ${params.amount}`,
-      };
-    }
+  const balance = await getBalance(client);
+  if (balance < params.amount) {
+    throw new Error(`Insufficient balance. Have ${balance}, need ${params.amount}`);
+  }
 
-    const result = await executeTransfer(client, params);
+  return params;
+}
+```
+
+For cases where you want a **non-throwing** structured short-circuit (e.g. an HTTP 404 from the mirror node should produce a "not found" message but isn't really an error), return the structured response directly from `coreAction` and let the lifecycle complete normally:
+
+```typescript
+async coreAction(params: GetTokenInfoParams, _context: Context, client: Client) {
+  const response = await fetch(/* ... */);
+  if (response.status === 404) {
     return {
-      raw: result,
-      humanMessage: formatTransferSuccess(result),
-    };
-  } catch (error) {
-    const desc = 'Failed to transfer';
-    const message = desc + (error instanceof Error ? `: ${error.message}` : '');
-    console.error('[transfer_tool]', message);
-    return {
-      raw: { error: message },
-      humanMessage: message,
+      raw: { error: 'Token not found' },
+      humanMessage: `Token ${params.tokenId} was not found on the network`,
     };
   }
-};
+  if (!response.ok) {
+    throw new Error(`Mirror node returned ${response.status}`);
+  }
+  // ...
+}
 ```
 
 ## Post-Processing Functions
@@ -120,7 +85,7 @@ const transferExecute = async (
 ### Transaction Results
 
 ```typescript
-import { RawTransactionResponse } from 'hedera-agent-kit';
+import { RawTransactionResponse } from '@hashgraph/hedera-agent-kit';
 
 const postProcess = (response: RawTransactionResponse): string => {
   // Handle scheduled transactions
@@ -202,21 +167,19 @@ const postProcess = (balance: AccountBalance): string => {
 
 ## Built-in Output Parsers
 
+Set `outputParser` as a property on your `BaseTool` subclass.
+
 ### transactionToolOutputParser
 
 Use for mutation tools:
 
 ```typescript
-import { transactionToolOutputParser } from 'hedera-agent-kit';
+import { transactionToolOutputParser } from '@hashgraph/hedera-agent-kit';
 
-const tool = (context: Context): Tool => ({
-  method: CREATE_TOKEN_TOOL,
-  name: 'Create Token',
-  description: createTokenPrompt(context),
-  parameters: createTokenParameters(context),
-  execute: createToken,
-  outputParser: transactionToolOutputParser,  // Built-in parser
-});
+export class CreateTokenTool extends BaseTool</* ... */> {
+  outputParser = transactionToolOutputParser;
+  // ...
+}
 ```
 
 ### untypedQueryOutputParser
@@ -224,57 +187,31 @@ const tool = (context: Context): Tool => ({
 Use for query tools:
 
 ```typescript
-import { untypedQueryOutputParser } from 'hedera-agent-kit';
+import { untypedQueryOutputParser } from '@hashgraph/hedera-agent-kit';
 
-const tool = (context: Context): Tool => ({
-  method: GET_TOKEN_INFO_TOOL,
-  name: 'Get Token Info',
-  description: getTokenInfoPrompt(context),
-  parameters: tokenInfoParameters(context),
-  execute: getTokenInfo,
-  outputParser: untypedQueryOutputParser,  // Built-in parser
-});
+export class GetTokenInfoTool extends BaseTool</* ... */> {
+  outputParser = untypedQueryOutputParser;
+  // ...
+}
 ```
 
-## Using handleTransaction
+## Using `handleTransaction`
 
-For mutation tools, use `handleTransaction` for consistent execution:
+For mutation tools, call `handleTransaction` from `secondaryAction`. It handles execution, error mapping, and feeds `RawTransactionResponse` into your `postProcess`:
 
 ```typescript
-import { handleTransaction, RawTransactionResponse } from 'hedera-agent-kit';
+import { handleTransaction, RawTransactionResponse, BaseTool } from '@hashgraph/hedera-agent-kit';
 
-const createToken = async (
-  client: Client,
-  context: Context,
-  params: CreateTokenParams,
-) => {
-  try {
-    // Build the Hedera transaction
-    const tx = new TokenCreateTransaction()
-      .setTokenName(params.tokenName)
-      .setTokenSymbol(params.tokenSymbol)
-      .setTreasuryAccountId(params.treasuryAccountId);
-
-    // handleTransaction manages execution and formatting
-    return await handleTransaction(tx, client, context, postProcess);
-  } catch (error) {
-    const desc = 'Failed to create token';
-    const message = desc + (error instanceof Error ? `: ${error.message}` : '');
-    console.error('[create_token_tool]', message);
-    return {
-      raw: { status: Status.InvalidTransaction, error: message },
-      humanMessage: message,
-    };
-  }
-};
+async secondaryAction(transaction: TokenCreateTransaction, client: Client, context: Context) {
+  return handleTransaction(transaction, client, context, postProcess);
+}
 ```
 
 ## Logging Conventions
 
-Use consistent logging format:
+Use consistent logging format inside `handleError` and any custom logs:
 
 ```typescript
-// Tool identifier in brackets, followed by message
 console.error('[create_token_tool]', 'Failed to create token:', error.message);
 console.log('[transfer_tool]', 'Transfer completed:', result.transactionId);
 console.warn('[query_tool]', 'Rate limit approaching');
@@ -284,25 +221,29 @@ console.warn('[query_tool]', 'Rate limit approaching');
 
 ```typescript
 import { z } from 'zod';
-import { Client, Status } from '@hashgraph/sdk';
-import { Context, Tool } from 'hedera-agent-kit';
-import { handleTransaction, RawTransactionResponse, transactionToolOutputParser } from 'hedera-agent-kit';
+import { Client, Status, TokenMintTransaction } from '@hiero-ledger/sdk';
+import {
+  BaseTool,
+  Context,
+  handleTransaction,
+  RawTransactionResponse,
+  transactionToolOutputParser,
+} from '@hashgraph/hedera-agent-kit';
 
 export const MINT_TOKEN_TOOL = 'mint_token_tool';
 
-const mintTokenPrompt = (context: Context = {}) => {
-  return `This tool mints additional supply of a fungible token on Hedera.
+const mintTokenPrompt = (_context: Context = {}) => `
+This tool mints additional supply of a fungible token on Hedera.
 Parameters:
 - tokenId (str, required): The token ID to mint
 - amount (int, required): Amount of tokens to mint`;
-};
 
-const mintTokenParameters = (context: Context = {}) => {
-  return z.object({
-    tokenId: z.string().describe('Token ID to mint'),
-    amount: z.number().int().positive().describe('Amount to mint'),
-  });
-};
+const mintTokenParameters = (_context: Context = {}) => z.object({
+  tokenId: z.string().describe('Token ID to mint'),
+  amount: z.number().int().positive().describe('Amount to mint'),
+});
+
+type MintTokenParams = z.infer<ReturnType<typeof mintTokenParameters>>;
 
 const postProcess = (response: RawTransactionResponse): string => {
   if (response.scheduleId) {
@@ -310,68 +251,69 @@ const postProcess = (response: RawTransactionResponse): string => {
 Transaction ID: ${response.transactionId}
 Schedule ID: ${response.scheduleId.toString()}`;
   }
-
   return `Tokens minted successfully.
 Transaction ID: ${response.transactionId}
-New Supply: ${response.newTotalSupply || 'Updated'}`;
+New Supply: ${response.newTotalSupply ?? 'Updated'}`;
 };
 
-const mintToken = async (
-  client: Client,
-  context: Context,
-  params: z.infer<ReturnType<typeof mintTokenParameters>>,
-) => {
-  try {
-    // Validate token exists and has supply key
-    const tokenInfo = await getTokenInfo(params.tokenId);
+export class MintTokenTool extends BaseTool<MintTokenParams, MintTokenParams> {
+  method = MINT_TOKEN_TOOL;
+  name = 'Mint Token';
+  description: string;
+  parameters: ReturnType<typeof mintTokenParameters>;
+  outputParser = transactionToolOutputParser;
+
+  constructor(context: Context) {
+    super();
+    this.description = mintTokenPrompt(context);
+    this.parameters = mintTokenParameters(context);
+  }
+
+  // Stage 2 — validate preconditions; throw on failure.
+  async normalizeParams(params: MintTokenParams) {
+    const tokenInfo = await fetchTokenInfo(params.tokenId);
     if (!tokenInfo) {
-      return {
-        raw: { error: 'Token not found' },
-        humanMessage: `Token ${params.tokenId} does not exist`,
-      };
+      throw new Error(`Token ${params.tokenId} does not exist`);
     }
-
     if (!tokenInfo.supplyKey) {
-      return {
-        raw: { error: 'No supply key' },
-        humanMessage: `Token ${params.tokenId} does not have a supply key and cannot be minted`,
-      };
+      throw new Error(`Token ${params.tokenId} does not have a supply key and cannot be minted`);
     }
+    return params;
+  }
 
-    // Build and execute transaction
-    const tx = new TokenMintTransaction()
+  // Stage 4 — build the transaction.
+  async coreAction(params: MintTokenParams, _context: Context, _client: Client) {
+    return new TokenMintTransaction()
       .setTokenId(params.tokenId)
       .setAmount(params.amount);
+  }
 
-    return await handleTransaction(tx, client, context, postProcess);
-  } catch (error) {
-    const desc = 'Failed to mint tokens';
-    const message = desc + (error instanceof Error ? `: ${error.message}` : '');
+  // Stage 6 — sign and submit.
+  async secondaryAction(transaction: TokenMintTransaction, client: Client, context: Context) {
+    return handleTransaction(transaction, client, context, postProcess);
+  }
+
+  async handleError(error: unknown, _context: Context) {
+    const message = 'Failed to mint tokens' + (error instanceof Error ? `: ${error.message}` : '');
     console.error('[mint_token_tool]', message);
     return {
       raw: { status: Status.InvalidTransaction, error: message },
       humanMessage: message,
     };
   }
-};
+}
 
-const tool = (context: Context): Tool => ({
-  method: MINT_TOKEN_TOOL,
-  name: 'Mint Token',
-  description: mintTokenPrompt(context),
-  parameters: mintTokenParameters(context),
-  execute: mintToken,
-  outputParser: transactionToolOutputParser,
-});
+declare function fetchTokenInfo(tokenId: string): Promise<{ supplyKey?: unknown } | null>;
 
+const tool = (context: Context): BaseTool => new MintTokenTool(context);
 export default tool;
 ```
 
 ## Error Response Best Practices
 
-1. **Always return structured response**: Even errors should have `raw` and `humanMessage`
-2. **Include error context**: Add the operation description before the error message
-3. **Log with tool identifier**: Use `[tool_name]` prefix in console logs
-4. **Validate before executing**: Check preconditions and return early with clear messages
-5. **Use appropriate Status**: Include Hedera SDK Status codes when applicable
-6. **Format for users**: Make `humanMessage` readable without technical jargon
+1. **Throw, don't `try/catch` per stage** — let `BaseTool.execute()` route through `handleError`
+2. **Return structured short-circuits** for "expected absences" (404s, missing optional resources) where the call is not really an error
+3. **Tag logs with the tool method** in `handleError`
+4. **Use Hedera `Status` codes** in the `raw` payload for transaction failures
+5. **Validate preconditions in `normalizeParams`** so failures fire before the transaction is built
+6. **Format `humanMessage` for users** — readable, no stack traces, no internal jargon

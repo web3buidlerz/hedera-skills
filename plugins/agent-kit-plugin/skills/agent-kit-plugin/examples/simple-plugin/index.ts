@@ -5,11 +5,10 @@
  * the basic structure of a Hedera Agent Kit plugin.
  *
  * Install dependencies:
- *   npm install hedera-agent-kit @hashgraph/sdk zod
+ *   npm install @hashgraph/hedera-agent-kit @hiero-ledger/sdk zod
  */
 
-import { Context } from 'hedera-agent-kit';
-import { Plugin } from 'hedera-agent-kit';
+import { Context, Plugin } from '@hashgraph/hedera-agent-kit';
 import greetingTool, { GREETING_TOOL } from './tools/greeting';
 
 /**
