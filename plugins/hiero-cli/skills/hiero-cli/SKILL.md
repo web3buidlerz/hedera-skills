@@ -1,9 +1,12 @@
 ---
 name: hiero-cli
 description: Use when user wants to interact with Hedera blockchain: create/transfer
-  tokens, manage NFTs, deploy contracts, manage topics, transfer HBAR, configure
-  networks. Provides full spec for hcli CLI tool. Trigger keywords: hedera, hiero,
-  hbar, token, nft, contract, topic, hcli, ledger
+  tokens, manage NFTs, deploy contracts, manage topics, transfer HBAR, sign x402
+  payment challenges, configure networks. ALSO use when an HTTP request returns 402
+  with a PAYMENT-REQUIRED header for the Hedera x402 scheme (or the user wants to pay
+  an x402-gated endpoint on Hedera): read references/x402.md for the full GET→402→
+  sign→retry flow. Provides full spec for hcli CLI tool. Trigger keywords: hedera,
+  hiero, hbar, token, nft, contract, topic, x402, 402, payment-required, hcli, ledger
 ---
 
 # hiero-cli (hcli)
@@ -84,6 +87,7 @@ State is persisted in `~/.hiero-cli/state/` as JSON files, one per plugin namesp
 | `batch`             | Batch transactions         | create batch, add transactions, execute, list, delete                                                                                                                                                                                                                                   |
 | `swap`              | Multi-party asset exchange | create swap, add HBAR/FT/NFT transfers, view, list, execute, delete                                                                                                                                                                                                                     |
 | `eip712`            | EIP-712 typed data signing | `hash` compute digest, `sign-ecdsa` / `sign-ed25519` sign payload (accepts pre-computed hash or domain+types+message), `verify-ecdsa` recover signer EVM address, `verify-ed25519` verify Ed25519 signature against a public key                                                        |
+| `x402`              | x402 payment signing       | sign a `PAYMENT-REQUIRED` challenge into a `PAYMENT-SIGNATURE` header via KMS; payer key never exposed, facilitator submits                                                                                                                                                              |
 | `plugin-management` | Plugin lifecycle           | add, remove, enable, disable, list, reset, info                                                                                                                                                                                                                                         |
 
 ## Agent instruction
@@ -101,6 +105,15 @@ Example: to batch `hcli token mint-ft`, read both `references/batch.md` and `ref
 Only commands marked **[scheduled]** in their reference support `--scheduled <name>` / `-X`.
 
 Example: to schedule `hcli token burn-ft`, read both `references/schedule.md` and `references/token.md`.
+
+## x402 paid endpoints
+
+If fetching a URL returns HTTP `402` with a `PAYMENT-REQUIRED` header, the
+endpoint is x402-gated. Inspect the header payload: if its `accepts` lists a
+`hedera:mainnet` / `hedera:testnet` `exact` requirement, **read
+`references/x402.md`** and follow the flow there. The agent makes the HTTP
+requests itself; `hcli x402 sign` only produces the `PAYMENT-SIGNATURE` value.
+If the challenge is for a non-Hedera scheme, this CLI cannot sign it.
 
 ## hcli not found / not installed
 
