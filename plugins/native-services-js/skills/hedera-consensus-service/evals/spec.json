@@ -82,7 +82,8 @@
           "name": "verifies-receipts",
           "type": "contains",
           "value": "getReceipt",
-          "description": "Gets receipt for each chunk"
+          "description": "Gets receipt for each chunk",
+          "rubric": "The output verifies each chunk succeeded (for example getReceipt, checking response status from executeAll, or logging receipt/sequence number per chunk)"
         },
         {
           "name": "mentions-sequence-number",
@@ -127,7 +128,8 @@
           "name": "switches-operator",
           "type": "contains",
           "value": "setOperator",
-          "description": "Switches client operator to the new account"
+          "description": "Switches client operator to the new account",
+          "rubric": "The output submits from the new account (for example calling setOperator on the existing client, or creating a new Client configured with the second account's credentials)"
         }
       ]
     }

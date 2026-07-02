@@ -30,8 +30,8 @@
           "name": "handles-association",
           "type": "contains",
           "value": "TokenAssociateTransaction",
-          "description": "Associates recipient account with token before transfer",
-          "rubric": "The output associates the recipient with the token before transfer (TokenAssociateTransaction) or uses auto-association so a transfer to a new account is valid"
+          "description": "Handles token association before transfer",
+          "rubric": "The output handles token association for the recipient before transfer (for example TokenAssociateTransaction, setMaxAutomaticTokenAssociations for auto-association, or explaining why association is needed)"
         },
         {
           "name": "uses-transfer-transaction",
@@ -70,7 +70,8 @@
           "name": "mints-with-metadata",
           "type": "contains",
           "value": "addMetadata",
-          "description": "Mints NFTs with metadata"
+          "description": "Mints NFTs with metadata",
+          "rubric": "The output mints NFTs with metadata (for example addMetadata, setMetadata, or passing metadata bytes to the mint call)"
         },
         {
           "name": "uses-nft-transfer",
@@ -90,7 +91,7 @@
           "type": "regex",
           "value": "setNumerator\\(5\\)",
           "description": "Sets 5% royalty numerator",
-          "rubric": "The output sets the royalty numerator to 5 for the 5% royalty fee"
+          "rubric": "The output configures a 5% royalty fee (for example numerator 5 / denominator 100, or numerator 1 / denominator 20, or any equivalent fraction)"
         }
       ]
     },

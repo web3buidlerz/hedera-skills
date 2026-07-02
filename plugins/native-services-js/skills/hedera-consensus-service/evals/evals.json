@@ -25,7 +25,7 @@
       "assertions": [
         "The output uses executeAll() to get all chunk responses",
         "The output creates a large message around 5KB (for example using repeat, Buffer.alloc, or similar)",
-        "The output gets receipt for each chunk",
+        "The output verifies each chunk succeeded (for example getReceipt, checking response status from executeAll, or logging receipt/sequence number per chunk)",
         "The output checks or logs the sequence number from receipts"
       ]
     },
@@ -39,7 +39,7 @@
         "The output sets fee schedule key on the topic",
         "The output uses CustomFeeLimit when submitting",
         "The output uses a separate submitting account (created with AccountCreateTransaction or clearly configured as a non-operator account)",
-        "The output switches client operator to the new account"
+        "The output submits from the new account (for example calling setOperator on the existing client, or creating a new Client configured with the second account's credentials)"
       ]
     }
   ]

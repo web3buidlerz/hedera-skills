@@ -10,7 +10,7 @@
         "The output imports from @hiero-ledger/sdk",
         "The output uses TokenCreateTransaction to create the token",
         "The output sets token decimals to 8 (for example via setDecimals(8) or an equivalent variable)",
-        "The output associates the recipient with the token before transfer (TokenAssociateTransaction) or uses auto-association so a transfer to a new account is valid",
+        "The output handles token association for the recipient before transfer (for example TokenAssociateTransaction, setMaxAutomaticTokenAssociations for auto-association, or explaining why association is needed)",
         "The output uses TransferTransaction for the token transfer",
         "The output uses a negative token amount for the sender in addTokenTransfer"
       ]
@@ -23,10 +23,10 @@
       "assertions": [
         "The output sets token type to NonFungibleUnique",
         "The output uses CustomRoyaltyFee for the 5% royalty",
-        "The output includes addMetadata: Mints NFTs with metadata",
+        "The output mints NFTs with metadata (for example addMetadata, setMetadata, or passing metadata bytes to the mint call)",
         "The output uses addNftTransfer for NFT transfer",
         "The output sets a supply key via setSupplyKey (required for minting)",
-        "The output sets the royalty numerator to 5 for the 5% royalty fee"
+        "The output configures a 5% royalty fee (for example numerator 5 / denominator 100, or numerator 1 / denominator 20, or any equivalent fraction)"
       ]
     },
     {
