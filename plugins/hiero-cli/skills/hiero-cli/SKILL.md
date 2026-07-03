@@ -1,9 +1,6 @@
 ---
 name: hiero-cli
-description: Use when user wants to interact with Hedera blockchain: create/transfer
-  tokens, manage NFTs, deploy contracts, manage topics, transfer HBAR, configure
-  networks. Provides full spec for hcli CLI tool. Trigger keywords: hedera, hiero,
-  hbar, token, nft, contract, topic, hcli, ledger
+description: "Use when user wants to interact with Hedera blockchain: create/transfer tokens, manage NFTs, deploy contracts, manage topics, transfer HBAR, configure networks. Provides full spec for hcli CLI tool. Trigger keywords: hedera, hiero, hbar, token, nft, contract, topic, hcli, ledger"
 ---
 
 # hiero-cli (hcli)
