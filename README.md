@@ -229,6 +229,43 @@ Each plugin contains:
 - `skills/<name>/SKILL.md` - Instructions for the agent
 - `skills/<name>/references/` - Supporting documentation
 - `skills/<name>/examples/` - Working code examples (optional)
+- `skills/<name>/evals/spec.json` - Structured eval checks (source of truth)
+- `skills/<name>/evals/evals.json` - Generated assertions for `agent-skills-eval`
+
+## Skill Evaluations
+
+Skills with automated evals use a two-file layout:
+
+| File | Purpose |
+|------|---------|
+| `evals/spec.json` | Structured checks (`name`, `type`, `value`, `description`, optional `rubric`) — edit this |
+| `evals/evals.json` | Generated string assertions for [agent-skills-eval](https://github.com/darkrishabh/agent-skills-eval) — do not edit by hand |
+
+Compile before running evals:
+
+```bash
+npm run evals:compile
+```
+
+Verify generated files are up to date (for CI):
+
+```bash
+npm run evals:compile:check
+```
+
+Run evals for a skill (requires `OPENAI_API_KEY` and optional `OPENAI_BASE_URL` for OpenRouter):
+
+```bash
+set -a && source .env && set +a
+
+npx agent-skills-eval ./plugins/native-services-js/skills/hedera-token-service \
+  --target deepseek/deepseek-v4-flash \
+  --judge deepseek/deepseek-v4-flash \
+  --baseline \
+  --report
+```
+
+Add optional `rubric` on a check when the auto-generated judge text is too brittle (for example regex-based checks).
 
 ## License
 
