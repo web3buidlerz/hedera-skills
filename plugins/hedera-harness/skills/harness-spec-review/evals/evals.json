@@ -1,0 +1,101 @@
+{
+  "skill_name": "harness-spec-review",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Review this harness pack. specs/demo.yaml has name: demo and templateMetadata.name: demo, but validators/demo-static.json asserts template.json name equals my-template. The yarn validator's first command is named yarn-install instead of install. Contract is uncommented but validator.enabled is missing. PRD contains 'C1' and a howToVerify paragraph copied from the contract. Produce a blocker-oriented review.",
+      "expected_output": "A review report flagging name mismatch, missing install command name, Tier 3 misconfiguration (contract without validator.enabled), and oracle-integrity failure (contract text in PRD).",
+      "files": [],
+      "assertions": [
+        {
+          "name": "flags-name-mismatch",
+          "type": "regex",
+          "value": "(name|templateMetadata|template\\.json).{0,80}(mismatch|disagree|inconsist|does not match|≠|!=)",
+          "description": "Flags cross-file name inconsistency"
+        },
+        {
+          "name": "flags-install-name",
+          "type": "regex",
+          "value": "(\"name\"\\s*:\\s*\"install\"|named install|command.*install)",
+          "description": "Flags missing literal install command name"
+        },
+        {
+          "name": "flags-tier3-incomplete",
+          "type": "regex",
+          "value": "(validator\\.enabled|contract.*validator|Tier 3)",
+          "description": "Flags Tier 3 needing both contract and validator.enabled"
+        },
+        {
+          "name": "flags-oracle-leak",
+          "type": "regex",
+          "value": "(oracle|howToVerify|PRD.*(C1|assertion)|contract.*PRD)",
+          "description": "Flags contract assertion text leaking into the PRD"
+        },
+        {
+          "name": "uses-blocker-severity",
+          "type": "regex",
+          "value": "(Blocker|🔴|blocker)",
+          "description": "Reports blockers distinctly"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Audit whether this pack is safe to enable chainValidation. Spec has contract + validator.enabled, chainValidation.enabled true, network: mainnet, and one assertion with executableWithTestSigner true. Playwright smoke lists deep UX steps that belong in the contract. Report findings.",
+      "expected_output": "Blocker for network mainnet; warning that Playwright is too thick; confirmation that executableWithTestSigner requires chainValidation (present) but network must be testnet.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "flags-mainnet",
+          "type": "regex",
+          "value": "(mainnet|network:\\s*testnet|testnet)",
+          "description": "Flags non-testnet chainValidation.network"
+        },
+        {
+          "name": "mentions-chain-validation-field",
+          "type": "contains",
+          "value": "chainValidation",
+          "description": "References chainValidation"
+        },
+        {
+          "name": "mentions-executable-field",
+          "type": "contains",
+          "value": "executableWithTestSigner",
+          "description": "References executableWithTestSigner"
+        },
+        {
+          "name": "flags-thick-playwright",
+          "type": "regex",
+          "value": "(Playwright|Tier 2).{0,60}(thin|thick|deep|contract|Tier 3)",
+          "description": "Warns that deep UX belongs in Tier 3 not Playwright"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Check skills: list on specs/demo.yaml which includes hedera-consensus-service and harness-spec-author. Is that correct?",
+      "expected_output": "Warn that harness-spec-author must not be vendored into generator runs; hedera-consensus-service is fine.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "rejects-author-in-skills",
+          "type": "regex",
+          "value": "harness-spec-author",
+          "description": "Calls out harness-spec-author in skills list"
+        },
+        {
+          "name": "allows-generator-skill",
+          "type": "contains",
+          "value": "hedera-consensus-service",
+          "description": "Acknowledges generator-facing skill as appropriate"
+        },
+        {
+          "name": "explains-audience",
+          "type": "regex",
+          "value": "(generator|vendor|authoring|do not)",
+          "description": "Explains authoring vs generator audience split"
+        }
+      ]
+    }
+  ]
+}

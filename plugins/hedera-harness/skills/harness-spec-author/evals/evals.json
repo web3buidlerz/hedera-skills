@@ -1,0 +1,119 @@
+{
+  "skill_name": "harness-spec-author",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I have a hedera-harness clone open. Help me author a Tier 0-1 benchmark pack for an HCS proof-wall demo called proof-wall: users browse a public message wall without a wallet, and posting requires connecting a wallet. No Solidity. Default seed. Emit the PRD, spec, static validator, and yarn validator.",
+      "expected_output": "A coherent Tier 0-1 pack under docs/prds/proof-wall.md, specs/proof-wall.yaml, validators/proof-wall-static.json, validators/proof-wall-yarn.json with matching names, commented higher tiers, and a yarn command named install.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "writes-spec-yaml",
+          "type": "contains",
+          "value": "validators.static",
+          "description": "Spec includes validators.static (harness loader field)"
+        },
+        {
+          "name": "includes-template-metadata",
+          "type": "contains",
+          "value": "templateMetadata",
+          "description": "Spec includes templateMetadata (harness loader field)"
+        },
+        {
+          "name": "names-install-command",
+          "type": "regex",
+          "value": "\"name\"\\s*:\\s*\"install\"",
+          "description": "Command validator has a command literally named install"
+        },
+        {
+          "name": "recommends-hcs-skill",
+          "type": "contains",
+          "value": "hedera-consensus-service",
+          "description": "Recommends generator skill hedera-consensus-service for HCS"
+        },
+        {
+          "name": "keeps-tiers-commented-or-minimal",
+          "type": "regex",
+          "value": "(#\\s*contract:|#\\s*validator:|#\\s*playwright:|Tier 0)",
+          "description": "Defaults to Tier 0-1 / keeps higher tiers commented"
+        },
+        {
+          "name": "separates-authoring-from-generator",
+          "type": "regex",
+          "value": "(not.*skills:|do not.*vendor|authoring.?only|generator)",
+          "description": "States that authoring skills must not be vendored into generator skills lists"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Deepen my existing proof-wall pack to Tier 3. Derive acceptance contract assertions from the PRD journeys (browse without wallet; wallet-gated post). Do not put C1/howToVerify into the PRD.",
+      "expected_output": "An acceptance contract with C1/C2/... assertions, evaluationRules fail-closed posture, and instructions to uncomment contract + validator in the spec — without mirroring assertion text into the PRD.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses-assertion-ids",
+          "type": "contains",
+          "value": "\"id\": \"C1\"",
+          "description": "Contract uses numbered assertion ids starting at C1"
+        },
+        {
+          "name": "includes-howto-verify",
+          "type": "contains",
+          "value": "howToVerify",
+          "description": "Assertions include howToVerify"
+        },
+        {
+          "name": "includes-executable-flag-field-awareness",
+          "type": "contains",
+          "value": "executableWithTestSigner",
+          "description": "Mentions or uses executableWithTestSigner (loader/grader field)"
+        },
+        {
+          "name": "fail-closed-rules",
+          "type": "contains",
+          "value": "failOnUncertainty",
+          "description": "evaluationRules include failOnUncertainty"
+        },
+        {
+          "name": "oracle-integrity-reminder",
+          "type": "regex",
+          "value": "(oracle|blind|not.*PRD|PRD.*product-facing|do not.*PRD)",
+          "description": "Reminds that contract text must not go into the PRD"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "When should I enable chainValidation for my harness pack, and what YAML fields do I need?",
+      "expected_output": "Guidance that Tier 3.5 is opt-in, requires Tier 3, network testnet, operator env vars, and executableWithTestSigner assertions.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions-chain-validation",
+          "type": "contains",
+          "value": "chainValidation",
+          "description": "References chainValidation block"
+        },
+        {
+          "name": "requires-testnet",
+          "type": "contains",
+          "value": "network: testnet",
+          "description": "Specifies chainValidation.network testnet"
+        },
+        {
+          "name": "mentions-operator-env",
+          "type": "regex",
+          "value": "HEDERA_OPERATOR_(ID|KEY)",
+          "description": "Mentions operator env var names"
+        },
+        {
+          "name": "ties-to-executable-flag",
+          "type": "contains",
+          "value": "executableWithTestSigner",
+          "description": "Ties on-chain grading to executableWithTestSigner"
+        }
+      ]
+    }
+  ]
+}
