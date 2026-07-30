@@ -15,6 +15,7 @@ A marketplace of plugins and skills for AI coding agents. Includes Hedera-specif
 /plugin install system-contracts
 /plugin install native-services-js
 /plugin install hackathon-helper
+/plugin install hedera-harness
 /plugin install dev-intelligence
 ```
 
@@ -141,6 +142,24 @@ Two skills for Hedera hackathon participants: project planning and submission va
 - Success (20%) - Hedera account growth, TPS impact, audience exposure
 - Pitch (10%) - Problem/solution clarity, metrics, Hedera representation
 
+### hedera-harness
+
+Two skills for authoring and reviewing [hedera-harness](https://github.com/hedera-dev/hedera-harness) benchmark packs — the PRD, spec YAML, validators, Playwright smoke, and acceptance contract that drive Scaffold HBAR template generation. Compatible with any AI coding agent that supports skills.
+
+**Skills included:**
+
+- **harness-spec-author** — Interactive authoring workflow. Locates a harness clone (or reconstructs from references), gathers the product idea in batches, copies skeletons, emits a Tier 0–1 pack, recommends generator `skills:` names, and optionally deepens to Tier 2 / 3 / 3.5.
+- **harness-spec-review** — Pack auditor. Checks cross-file name/path consistency, tier prerequisites, severity budget, thin Playwright, and oracle integrity (no contract text in the PRD), then reports blockers and warnings before a run.
+
+**Use when:**
+
+- Turning a Hedera demo idea into hedera-harness inputs
+- Writing a harness PRD, spec, or acceptance contract
+- Reviewing a benchmark pack before `harness run`
+- Deciding which validation tiers to enable and in what order
+
+**Important:** These are **authoring** skills. Do not list them in a template spec's `skills:` field — that list is vendored into generator workspaces. Use existing index names (`hedera-consensus-service`, `hts-system-contract`, …) there instead.
+
 ### dev-intelligence
 
 AI development workflow toolkit — session continuity, quality gates, project scaffolding, and tech debt tracking for any codebase. Works with any language or framework.
@@ -206,6 +225,16 @@ hedera-skills/
 │   │       │   └── references/
 │   │       └── hedera-consensus-service/
 │   │           ├── SKILL.md
+│   │           └── references/
+│   ├── hedera-harness/       # Harness benchmark pack authoring & review
+│   │   └── skills/
+│   │       ├── harness-spec-author/
+│   │       │   ├── SKILL.md
+│   │       │   ├── evals/
+│   │       │   └── references/
+│   │       └── harness-spec-review/
+│   │           ├── SKILL.md
+│   │           ├── evals/
 │   │           └── references/
 │   └── dev-intelligence/     # Dev workflow intelligence
 │       ├── skills/
