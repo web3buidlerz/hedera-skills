@@ -1,7 +1,8 @@
 # Acceptance contract guide
 
-The acceptance contract is the **grading oracle** for Tier 3. The semantic
-validator grades the running app against these assertions — not the raw PRD.
+The acceptance contract is the **oracle** for gate 3. The semantic validator
+grades the running app against these assertions — not the raw PRD. Keep the
+run **blind**. Terms: [GLOSSARY.md](../GLOSSARY.md).
 
 Source of truth in the harness repo:
 `skeletons/new-template/acceptance-contract.json`
@@ -24,7 +25,7 @@ Source of truth in the harness repo:
 | `severity` | `critical` \| `major` \| `minor` |
 | `walletRequired` | Whether the flow needs a wallet |
 | `verifiableWithoutCredentials` | Can pass with no `.env` / funded account |
-| `executableWithTestSigner` | Only with Tier 3.5 `chainValidation`; run real tx + mirror check |
+| `executableWithTestSigner` | Only with gate 3.5 `chainValidation`; run real tx + mirror check |
 | `statement` | What must be true |
 | `howToVerify` | Concrete browser (and mirror) steps |
 
@@ -109,4 +110,4 @@ PRD journeys: browse empty feed; wallet-gated "post message".
 ```
 
 Add a fourth assertion with `"executableWithTestSigner": true` only when enabling
-`chainValidation` (Tier 3.5).
+`chainValidation` (gate 3.5).

@@ -1,42 +1,21 @@
-# Pack anatomy
+# Spec files
 
-A hedera-harness benchmark pack is six coupled files. Paths below assume a
-harness clone root; replace `my-template` with the kebab slug.
+Compact Tier 0–1 bodies for reconstructing a **spec** without a harness clone.
+Prefer copying `skeletons/new-template/` when available. After writing, replace
+every `my-template` with the **slug**. Terms: [GLOSSARY.md](../GLOSSARY.md).
+
+## File table
 
 | File | Required? | Consumed by |
 |------|-----------|-------------|
-| `docs/prds/<name>.md` | Yes | Generator (vendored into workspace) |
-| `specs/<name>.yaml` | Yes | Harness CLI (`run` / `validate` / `validate-semantic`) |
-| `validators/<name>-static.json` | Yes | Tier 0–1 static validator |
-| `validators/<name>-yarn.json` | Yes | Tier 0–1 command validator |
-| `playwright/<name>-smoke.yaml` | Tier 2 | Playwright gate |
-| `contracts/<name>-acceptance.json` | Tier 3 | Semantic validator (grading oracle) |
-
-## Name-consistency map
-
-These must all agree on the same slug (`<name>`):
-
-| Location | Field |
-|----------|-------|
-| Spec | `name` |
-| Spec | `templateMetadata.name` |
-| Spec | `prd: docs/prds/<name>.md` |
-| Spec | `validators.static` / `validators.commands` paths |
-| Static JSON | `jsonAssertions` → `template.json` → `name` equals `<name>` |
-| Contract (if present) | `name`, `template`, `prd` |
-| Playwright (if present) | `name` (e.g. `<name>-smoke`) |
-
-Also keep in sync:
-
-- `spec.forbiddenFiles` ↔ `static.fileAssertions.forbidden`
-- `constraints.packageManager` ↔ static assertion on `package.json` `packageManager`
-- Contract `routes` ↔ Playwright `routes` ↔ PRD deliverable routes
+| `docs/prds/<name>.md` | Yes | Generator |
+| `specs/<name>.yaml` (**spec file**) | Yes | Harness CLI |
+| `validators/<name>-static.json` | Yes | Gate 0–1 |
+| `validators/<name>-yarn.json` | Yes | Gate 0–1 |
+| `playwright/<name>-smoke.yaml` | Gate 2 | Playwright **gate** |
+| `contracts/<name>-acceptance.json` | Gate 3 | Semantic validator (**oracle**) |
 
 ## Compact Tier 0–1 bodies
-
-Use these when reconstructing without a harness clone. Prefer copying
-`skeletons/new-template/` when available. After writing, replace every
-`my-template` with the slug.
 
 ### `specs/my-template.yaml`
 
@@ -197,7 +176,7 @@ Key loader fields: `prd`, `seed`, `generator`, `validators.static`,
 }
 ```
 
-Pin text needles to scripts the template will actually document — not incidental
+Pin **needles** to scripts the template will actually document — not incidental
 implementation detail that will churn.
 
 ### `validators/my-template-yarn.json`
@@ -245,7 +224,7 @@ See [prd-and-journeys.md](prd-and-journeys.md). Write
 `docs/prds/my-template.md` with Goal / Journeys / Hedera services / Non-goals /
 Deliverables / Acceptance pointer.
 
-## Tier 2 / 3 / 3.5 bodies
+## Gate 2 / 3 / 3.5 bodies
 
 Do not embed here — they drift. Copy from the harness skeletons or follow
 [tier-strategy.md](tier-strategy.md).

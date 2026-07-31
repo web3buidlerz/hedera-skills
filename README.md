@@ -144,21 +144,22 @@ Two skills for Hedera hackathon participants: project planning and submission va
 
 ### hedera-harness
 
-Two skills for authoring and reviewing [hedera-harness](https://github.com/hedera-dev/hedera-harness) benchmark packs — the PRD, spec YAML, validators, Playwright smoke, and acceptance contract that drive Scaffold HBAR template generation. Compatible with any AI coding agent that supports skills.
+Three skills for creating and reviewing [hedera-harness](https://github.com/hedera-dev/hedera-harness) specs — the PRD, spec file, validators, Playwright smoke, and acceptance contract (oracle) that drive Scaffold HBAR template generation. Compatible with any AI coding agent that supports skills.
 
 **Skills included:**
 
-- **harness-spec-author** — Interactive authoring workflow. Locates a harness clone (or reconstructs from references), gathers the product idea in batches, copies skeletons, emits a Tier 0–1 pack, recommends generator `skills:` names, and optionally deepens to Tier 2 / 3 / 3.5.
-- **harness-spec-review** — Pack auditor. Checks cross-file name/path consistency, tier prerequisites, severity budget, thin Playwright, and oracle integrity (no contract text in the PRD), then reports blockers and warnings before a run.
+- **harness-spec-anatomy** — Shared vocabulary (spec / slug / blind / oracle / gate / needle). Single source of truth for file layout and the mechanical `check-spec.sh` script.
+- **create-harness-spec** — Grills a product idea one question at a time, then emits a gate 0–1 spec (optional deeper gates). Prefers Matt Pocock `/grilling` when available.
+- **review-harness-spec** — Two-axis audit (Wiring via `check-spec.sh` + Oracle judgment) before a run.
 
 **Use when:**
 
 - Turning a Hedera demo idea into hedera-harness inputs
-- Writing a harness PRD, spec, or acceptance contract
-- Reviewing a benchmark pack before `harness run`
-- Deciding which validation tiers to enable and in what order
+- Writing a harness PRD, spec file, or acceptance contract
+- Reviewing a harness spec before `harness run`
+- Deciding which validation gates to enable and in what order
 
-**Important:** These are **authoring** skills. Do not list them in a template spec's `skills:` field — that list is vendored into generator workspaces. Use existing index names (`hedera-consensus-service`, `hts-system-contract`, …) there instead.
+**Important:** These are **authoring** skills. Do not list them in a template spec file's `skills:` field — that list is vendored into generator workspaces. Use existing index names (`hedera-consensus-service`, `hts-system-contract`, …) there instead.
 
 ### dev-intelligence
 
@@ -226,13 +227,18 @@ hedera-skills/
 │   │       └── hedera-consensus-service/
 │   │           ├── SKILL.md
 │   │           └── references/
-│   ├── hedera-harness/       # Harness benchmark pack authoring & review
+│   ├── hedera-harness/       # Harness spec authoring & review
 │   │   └── skills/
-│   │       ├── harness-spec-author/
+│   │       ├── harness-spec-anatomy/
+│   │       │   ├── SKILL.md
+│   │       │   ├── GLOSSARY.md
+│   │       │   ├── scripts/
+│   │       │   └── references/
+│   │       ├── create-harness-spec/
 │   │       │   ├── SKILL.md
 │   │       │   ├── evals/
 │   │       │   └── references/
-│   │       └── harness-spec-review/
+│   │       └── review-harness-spec/
 │   │           ├── SKILL.md
 │   │           ├── evals/
 │   │           └── references/

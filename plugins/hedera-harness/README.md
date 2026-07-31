@@ -1,8 +1,8 @@
 # Hedera Harness
 
-Agent skills for **authoring and reviewing** [hedera-harness](https://github.com/hedera-dev/hedera-harness) benchmark packs — PRD, spec YAML, validators, Playwright smoke, and acceptance contracts that drive Scaffold HBAR template generation.
+Agent skills for **creating and reviewing** [hedera-harness](https://github.com/hedera-dev/hedera-harness) specs — PRD, spec file, validators, Playwright smoke, and acceptance contracts (oracle) that drive Scaffold HBAR template generation.
 
-These skills are for the human or agent writing the pack **before** a run. They are **not** generator skills: do not list them in a template spec's `skills:` field (that list is vendored into the run workspace for the coding agent that builds the demo).
+These skills are for the human or agent writing the **spec** **before** a run. They are **not** generator skills: do not list them in a template **spec file**'s `skills:` field (that list is vendored into the run workspace for the coding agent that builds the demo).
 
 ## Installation
 
@@ -26,41 +26,53 @@ npx skills add hedera-dev/hedera-skills
 
 | Skill | Purpose |
 |-------|---------|
-| `harness-spec-author` | Interactive workflow: intake a product idea → emit a Tier 0–1 pack → optionally deepen to Tier 2 / 3 / 3.5 |
-| `harness-spec-review` | Audit an existing pack for cross-file inconsistencies, tier misconfiguration, and oracle-integrity issues before burning a run |
+| `harness-spec-anatomy` | Shared vocabulary + slug map + gates + `check-spec.sh` |
+| `create-harness-spec` | Grill an idea → emit a runnable **spec** |
+| `review-harness-spec` | Two-axis audit (Wiring + Oracle) before `harness run` |
 
-### harness-spec-author
+### harness-spec-anatomy
 
-Triggers when you say: "create a harness spec", "author a hedera-harness PRD", "build a scaffold-hbar benchmark", "write an acceptance contract", "set up Tier 0–3 validators", "turn this demo idea into harness inputs".
+Model-invoked vocabulary layer. Defines **spec**, **spec file**, **slug**, **blind**, **oracle**, **gate**, and **needle**. Houses the mechanical checker:
 
-**Provides:**
+```bash
+bash skills/harness-spec-anatomy/scripts/check-spec.sh <harness-root> <slug>
+```
 
-- Locate-harness / reconstruct-from-references workflow
-- Batched intake (product, Hedera services, routes, wallet vs read path, tier ambition)
-- Skeleton copy + slug rename aligned with the harness Quickstart
-- Compact Tier 0–1 templates and a name-consistency map
-- Journey → `C1…Cn` acceptance-contract guidance
-- Tier enable order and host prerequisites
-- Generator `skills:` recommendations from `skills-index.json` (never this plugin)
+### create-harness-spec
 
-### harness-spec-review
-
-Triggers when you say: "review my harness spec", "check this benchmark pack", "audit my acceptance contract", "is this pack ready to run".
+Triggers when you say: "create a harness spec", "turn this demo into harness inputs", "author a hedera-harness PRD".
 
 **Provides:**
 
-- Cross-file identity / path checks
-- Tier prerequisite validation (`contract` + `validator.enabled`, `chainValidation.network: testnet`, …)
-- Severity budget and thin-Playwright checks
-- Oracle-integrity check (no contract text in the PRD)
-- Blocker / warning / OK report with next CLI commands
+- Locate-harness / reconstruct-from-references
+- Hybrid grilling (prefer `/grilling` when installed; else inline one-question-at-a-time protocol)
+- Dependency-ordered decision tree (Solidity → skills; wallet writes → gate 3.5; ambition → which files)
+- Emit gate 0–1 by default; deepen optionally
+- Completion criterion: `check-spec.sh` exits clean
 
-## Key design rules
+### review-harness-spec
 
-1. **Two audiences** — authoring skills (this plugin) vs generator skills (`hedera-consensus-service`, `hts-system-contract`, …). Never conflate them.
-2. **Oracle integrity** — PRD is product-facing; the acceptance contract is the grading oracle. Do not paste `C1` / `howToVerify` into the PRD.
-3. **Tier 0–1 first** — keep Playwright, contract, validator, and `chainValidation` commented until lower tiers are green.
-4. **Hybrid templates** — Tier 0–1 bodies live in `references/`; Tier 2 / 3 / 3.5 bodies come from harness `skeletons/new-template/` (local clone or pinned GitHub raw).
+Triggers when you say: "review my harness spec", "is this ready to run", "audit my acceptance contract".
+
+**Provides:**
+
+- **Wiring** axis — script output (slug, REPLACE_ME, install name, gate pairing, blind scan)
+- **Oracle** axis — journey↔assertion traceability, severity budget, thin Playwright, needles
+- Side-by-side report (axes stay separate)
+
+## Glossary (leading words)
+
+| Term | Meaning |
+|------|---------|
+| **spec** | The coupled set of files for one benchmark |
+| **spec file** | `specs/<name>.yaml` specifically |
+| **slug** | Kebab name that must agree everywhere |
+| **blind** | Keep oracle text out of the PRD |
+| **oracle** | Acceptance contract JSON |
+| **gate** | Validation tier that can stop a run |
+| **needle** | Static text assertion |
+
+Full definitions: `skills/harness-spec-anatomy/GLOSSARY.md`.
 
 ## Works With
 
@@ -69,6 +81,7 @@ Triggers when you say: "review my harness spec", "check this benchmark pack", "a
 - Gemini CLI
 - Cursor and any agent that supports the skills/plugin format
 - [hedera-harness](https://github.com/hedera-dev/hedera-harness) CLI (`run`, `validate`, `validate-semantic`)
+- Optional: [mattpocock/skills](https://github.com/mattpocock/skills) `/grilling` (preferred when present)
 
 ## License
 

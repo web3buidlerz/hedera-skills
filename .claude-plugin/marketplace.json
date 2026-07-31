@@ -75,8 +75,8 @@
     },
     {
       "name": "hedera-harness",
-      "description": "Author and review hedera-harness benchmark packs (PRD, spec, validators, Playwright smoke, acceptance contract) for Scaffold HBAR template generation",
-      "version": "1.0.0",
+      "description": "Create and review hedera-harness specs (PRD, spec file, validators, Playwright smoke, acceptance contract) for Scaffold HBAR template generation — includes shared anatomy vocabulary",
+      "version": "1.1.0",
       "author": {
         "name": "Hedera Dev"
       },
@@ -87,6 +87,7 @@
         "harness",
         "hedera-harness",
         "benchmark",
+        "spec",
         "prd",
         "acceptance-contract",
         "scaffold-hbar",
