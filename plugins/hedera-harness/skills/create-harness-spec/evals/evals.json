@@ -7,54 +7,14 @@
       "expected_output": "A grilling session that asks one question at a time with a recommended answer, looks up harness facts, waits for shared understanding before writing files, then emits a coherent gate 0-1 spec under docs/prds/proof-wall.md, specs/proof-wall.yaml, validators/proof-wall-static.json, validators/proof-wall-yarn.json.",
       "files": [],
       "assertions": [
-        {
-          "name": "one-question-at-a-time",
-          "type": "regex",
-          "value": "(one question|one at a time|Ask.*one|waiting for|recommended answer)",
-          "description": "Follows grilling protocol: one question at a time / recommended answer"
-        },
-        {
-          "name": "waits-for-shared-understanding",
-          "type": "regex",
-          "value": "(shared understanding|confirm|go-ahead|before (writing|emitting|creating))",
-          "description": "Does not write files until shared understanding is confirmed"
-        },
-        {
-          "name": "writes-spec-file",
-          "type": "contains",
-          "value": "validators.static",
-          "description": "Spec file includes validators.static (harness loader field)"
-        },
-        {
-          "name": "includes-template-metadata",
-          "type": "contains",
-          "value": "templateMetadata",
-          "description": "Spec file includes templateMetadata (harness loader field)"
-        },
-        {
-          "name": "names-install-command",
-          "type": "regex",
-          "value": "\"name\"\\s*:\\s*\"install\"",
-          "description": "Command validator has a command literally named install"
-        },
-        {
-          "name": "recommends-hcs-skill",
-          "type": "contains",
-          "value": "hedera-consensus-service",
-          "description": "Recommends generator skill hedera-consensus-service for HCS"
-        },
-        {
-          "name": "keeps-run-blind",
-          "type": "regex",
-          "value": "(blind|oracle|PRD.*(journey|product)|journeys and outcomes)",
-          "description": "Keeps the run blind / separates PRD from oracle"
-        },
-        {
-          "name": "separates-authoring-from-generator",
-          "type": "regex",
-          "value": "(generator|skills:|authoring)",
-          "description": "States that authoring skills stay out of the generator skills list"
-        }
+        "The output satisfies: Follows grilling protocol: one question at a time / recommended answer",
+        "The output satisfies: Does not write files until shared understanding is confirmed",
+        "The output includes validators.static: Spec file includes validators.static (harness loader field)",
+        "The output includes templateMetadata: Spec file includes templateMetadata (harness loader field)",
+        "The output satisfies: Command validator has a command literally named install",
+        "The output includes hedera-consensus-service: Recommends generator skill hedera-consensus-service for HCS",
+        "The output satisfies: Keeps the run blind / separates PRD from oracle",
+        "The output satisfies: States that authoring skills stay out of the generator skills list"
       ]
     },
     {
@@ -63,42 +23,12 @@
       "expected_output": "A grilling session that picks extend mode, waits for shared understanding, then emits .harness/prd.md, .harness/spec.yaml (no seed, with extend.baseline), .harness/validators/static.json, .harness/validators/yarn.json, and hands off yarn harness:extend or hedera-harness extend.",
       "files": [],
       "assertions": [
-        {
-          "name": "chooses-extend-mode",
-          "type": "regex",
-          "value": "(extend|\\.harness/|in-place)",
-          "description": "Chooses extend / .harness layout"
-        },
-        {
-          "name": "waits-for-shared-understanding",
-          "type": "regex",
-          "value": "(shared understanding|confirm|go-ahead|before (writing|emitting|creating))",
-          "description": "Does not write files until shared understanding is confirmed"
-        },
-        {
-          "name": "emits-harness-dir-paths",
-          "type": "regex",
-          "value": "\\.harness/(spec\\.yaml|prd\\.md|validators/)",
-          "description": "Emits files under .harness/"
-        },
-        {
-          "name": "includes-extend-baseline",
-          "type": "contains",
-          "value": "extend.baseline",
-          "description": "Mentions or includes extend.baseline"
-        },
-        {
-          "name": "omits-seed-or-notes-no-seed",
-          "type": "regex",
-          "value": "(no seed|omit.*seed|without seed|No seed)",
-          "description": "Notes that extend has no seed"
-        },
-        {
-          "name": "hands-off-extend-cli",
-          "type": "regex",
-          "value": "(harness:extend|hedera-harness extend)",
-          "description": "Hands off to extend CLI / yarn script"
-        }
+        "The output satisfies: Chooses extend / .harness layout",
+        "The output satisfies: Does not write files until shared understanding is confirmed",
+        "The output satisfies: Emits files under .harness/",
+        "The output includes extend.baseline: Mentions or includes extend.baseline",
+        "The output satisfies: Notes that extend has no seed",
+        "The output satisfies: Hands off to extend CLI / yarn script"
       ]
     },
     {
@@ -107,36 +37,11 @@
       "expected_output": "An oracle with C1/C2/... assertions, evaluationRules fail-closed posture, and instructions to uncomment contract + validator in the spec file — without mirroring assertion text into the PRD.",
       "files": [],
       "assertions": [
-        {
-          "name": "uses-assertion-ids",
-          "type": "contains",
-          "value": "\"id\": \"C1\"",
-          "description": "Oracle uses numbered assertion ids starting at C1"
-        },
-        {
-          "name": "includes-howto-verify",
-          "type": "contains",
-          "value": "howToVerify",
-          "description": "Assertions include howToVerify"
-        },
-        {
-          "name": "includes-executable-flag-field-awareness",
-          "type": "contains",
-          "value": "executableWithTestSigner",
-          "description": "Mentions or uses executableWithTestSigner (loader/grader field)"
-        },
-        {
-          "name": "fail-closed-rules",
-          "type": "contains",
-          "value": "failOnUncertainty",
-          "description": "evaluationRules include failOnUncertainty"
-        },
-        {
-          "name": "blind-integrity-reminder",
-          "type": "regex",
-          "value": "(blind|oracle|not.*PRD|PRD.*product-facing|journeys and outcomes)",
-          "description": "Reminds that oracle text must not go into the PRD"
-        }
+        "The output includes \"id\": \"C1\": Oracle uses numbered assertion ids starting at C1",
+        "The output includes howToVerify: Assertions include howToVerify",
+        "The output includes executableWithTestSigner: Mentions or uses executableWithTestSigner (loader/grader field)",
+        "The output includes failOnUncertainty: evaluationRules include failOnUncertainty",
+        "The output satisfies: Reminds that oracle text must not go into the PRD"
       ]
     },
     {
@@ -145,30 +50,10 @@
       "expected_output": "Guidance that gate 3.5 is opt-in, requires gate 3, network testnet, operator env vars, and executableWithTestSigner assertions.",
       "files": [],
       "assertions": [
-        {
-          "name": "mentions-chain-validation",
-          "type": "contains",
-          "value": "chainValidation",
-          "description": "References chainValidation block"
-        },
-        {
-          "name": "requires-testnet",
-          "type": "contains",
-          "value": "network: testnet",
-          "description": "Specifies chainValidation.network testnet"
-        },
-        {
-          "name": "mentions-operator-env",
-          "type": "regex",
-          "value": "HEDERA_OPERATOR_(ID|KEY)",
-          "description": "Mentions operator env var names"
-        },
-        {
-          "name": "ties-to-executable-flag",
-          "type": "contains",
-          "value": "executableWithTestSigner",
-          "description": "Ties on-chain grading to executableWithTestSigner"
-        }
+        "The output includes chainValidation: References chainValidation block",
+        "The output includes network: testnet: Specifies chainValidation.network testnet",
+        "The output satisfies: Mentions operator env var names",
+        "The output includes executableWithTestSigner: Ties on-chain grading to executableWithTestSigner"
       ]
     }
   ]
