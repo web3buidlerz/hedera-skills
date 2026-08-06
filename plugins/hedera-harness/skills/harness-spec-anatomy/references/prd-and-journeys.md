@@ -2,7 +2,9 @@
 
 The PRD is the product brief the **generator** sees. Keep it product-facing.
 Numbered, browser-verifiable pass/fail rules live in the **oracle** — keep the
-run **blind**. Terms: [GLOSSARY.md](../GLOSSARY.md).
+run **blind**. Path is `docs/prds/<slug>.md` (clone / `run`) or
+`.harness/prd.md` (**extend**); content rules are the same.
+Terms: [GLOSSARY.md](../GLOSSARY.md).
 
 ## What the PRD carries
 

@@ -14,10 +14,13 @@ in a **spec file** carries generator skills (domain knowledge for the coding
 agent). Name skills like `hedera-consensus-service`, `hts-system-contract`,
 `project-scaffolding`. Keep authoring skills out of that list.
 
-## Spec files
+## Layouts
 
-A **spec** is six coupled files. Paths assume a harness clone root; replace
-`<name>` with the **slug**.
+A **spec** is the same six coupled concepts in either layout. Paths differ.
+
+### Clone / `run` (greenfield)
+
+Harness clone root. Seeds a fresh workspace from `scaffold-hbar`.
 
 | File | Required? | Consumed by |
 |------|-----------|-------------|
@@ -28,11 +31,33 @@ A **spec** is six coupled files. Paths assume a harness clone root; replace
 | `playwright/<name>-smoke.yaml` | Gate 2 | Playwright gate |
 | `contracts/<name>-acceptance.json` | Gate 3 | Semantic validator (**oracle**) |
 
+Artifacts: `runs/`. Handoff: `hedera-harness run specs/<slug>.yaml`.
+
+### Extend / in-place (scaffolded project)
+
+Already-scaffolded app root (parent of `.harness/`). **No seed** — the
+workspace is the project itself. Paths in the **spec file** are relative to
+that project root.
+
+| File | Required? | Consumed by |
+|------|-----------|-------------|
+| `.harness/prd.md` | Yes | Generator |
+| `.harness/spec.yaml` (**spec file**) | Yes | Harness CLI (`extend` / `validate` / `validate-semantic`) |
+| `.harness/validators/static.json` | Yes | Gate 0–1 static validator |
+| `.harness/validators/yarn.json` | Yes | Gate 0–1 command validator |
+| `.harness/playwright/<slug>-smoke.yaml` | Gate 2 | Playwright gate |
+| `.harness/contracts/<slug>-acceptance.json` | Gate 3 | Semantic validator (**oracle**) |
+
+Also required in the **spec file**: `extend.baseline` (commands that prove the
+host app is healthy before the extension). Artifacts: `.harness/runs/`.
+Handoff: `yarn harness:extend` or `hedera-harness extend .harness/spec.yaml`.
+
 Compact Tier 0–1 bodies and reconstruction notes: [references/spec-files.md](references/spec-files.md).
 
 ## Slug map
 
-These must all agree on the same **slug** (`<name>`):
+These must all agree on the same **slug** (`<name>`) in **clone / `run`**
+layout:
 
 | Location | Field |
 |----------|-------|
@@ -44,7 +69,14 @@ These must all agree on the same **slug** (`<name>`):
 | Oracle (if present) | `name`, `template`, `prd` |
 | Playwright (if present) | `name` (e.g. `<name>-smoke`) |
 
-Also keep in sync:
+**Extend layout differences:**
+
+- Spec file `name` is the extension slug (e.g. `hedera-demo-extend`)
+- `templateMetadata.name` is the **existing** template identity (e.g. `hedera-demo`) — it may differ from the extension slug
+- PRD / validator filenames often omit the slug (`.harness/prd.md`, `.harness/validators/static.json`)
+- Static validators usually assert app scripts / package fields, not `template.json` name (create-scaffold-hbar removes `template.json`)
+
+Also keep in sync (both layouts):
 
 - Spec file `forbiddenFiles` ↔ static `fileAssertions.forbidden`
 - `constraints.packageManager` ↔ static assertion on `package.json` `packageManager`
@@ -52,7 +84,8 @@ Also keep in sync:
 
 ## Gates
 
-Enable in order. Skeleton default is **gate 0–1 only**.
+Enable in order. Skeleton default is **gate 0–1 only**. Gate enablement is
+identical for `run` and `extend`; only copy targets and CLI commands differ.
 
 | Gate | Spec file fields | What it checks |
 |------|------------------|----------------|
@@ -78,12 +111,16 @@ change set:
 `prd`, `seed`, `generator`, `validators.static`, `validators.commands`,
 `validators.playwright`, `templateMetadata`, `requiredFiles`, `forbiddenFiles`,
 `secretScan`, `contract`, `validator`, `chainValidation`, `skills`,
-`executableWithTestSigner`, `maxAttempts`.
+`executableWithTestSigner`, `maxAttempts`, `extend`, `extend.baseline`.
 
 ## Mechanical check
 
 ```bash
+# Clone / run layout:
 bash skills/harness-spec-anatomy/scripts/check-spec.sh <harness-root> <slug>
+
+# Extend layout (project root that contains .harness/):
+bash skills/harness-spec-anatomy/scripts/check-spec.sh <project-root> <slug>
 ```
 
 Resolve the script path relative to the installed skill. Exit zero means wiring

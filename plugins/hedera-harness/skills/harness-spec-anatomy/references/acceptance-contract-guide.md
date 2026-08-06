@@ -2,11 +2,15 @@
 
 The acceptance contract is the **oracle** for gate 3. The semantic validator
 grades the running app against these assertions — not the raw PRD. Keep the
-run **blind**. Terms: [GLOSSARY.md](../GLOSSARY.md).
+run **blind**. Path is `contracts/<name>-acceptance.json` (clone / `run`) or
+`.harness/contracts/<slug>-acceptance.json` (**extend**).
+Terms: [GLOSSARY.md](../GLOSSARY.md).
 
 Source of truth in the harness repo:
 `skeletons/new-template/acceptance-contract.json`
 ([raw on main](https://raw.githubusercontent.com/hedera-dev/hedera-harness/main/skeletons/new-template/acceptance-contract.json)).
+Set `"prd"` to the layout-appropriate PRD path (`docs/prds/...` or
+`.harness/prd.md`).
 
 ## Derive assertions from PRD journeys
 

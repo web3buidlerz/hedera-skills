@@ -114,6 +114,38 @@
           "description": "Explains authoring vs generator audience split"
         }
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "Review this extend harness spec. .harness/spec.yaml has name: learn-page, no seed, no extend.baseline, validators under .harness/validators/, and templateMetadata.name: hedera-demo. Produce a two-axis review for the extend layout.",
+      "expected_output": "A review with ## Wiring and ## Oracle. Wiring flags missing extend.baseline (and install baseline command). Report notes layout=extend. Oracle may note O14/O15 extend checks.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "has-wiring-axis",
+          "type": "regex",
+          "value": "##[[:space:]]*Wiring",
+          "description": "Reports a Wiring axis section"
+        },
+        {
+          "name": "has-oracle-axis",
+          "type": "regex",
+          "value": "##[[:space:]]*Oracle",
+          "description": "Reports an Oracle axis section"
+        },
+        {
+          "name": "flags-missing-baseline",
+          "type": "regex",
+          "value": "(extend\\.baseline|baseline)",
+          "description": "Flags missing extend.baseline"
+        },
+        {
+          "name": "names-extend-layout",
+          "type": "regex",
+          "value": "(extend|\\.harness/)",
+          "description": "Recognizes extend / .harness layout"
+        }
+      ]
     }
   ]
 }

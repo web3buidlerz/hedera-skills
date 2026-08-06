@@ -4,19 +4,22 @@
 # Line-oriented only (grep/rg). No YAML/JSON parser. False positives/negatives
 # are possible on unusually formatted files; treat findings as leads, not law.
 #
-# Usage: bash check-spec.sh <harness-root> <slug>
+# Usage: bash check-spec.sh <root> <slug>
+#   Clone / run:  <root> = harness clone; expects specs/<slug>.yaml
+#   Extend:       <root> = project root; expects .harness/spec.yaml with name: <slug>
 # Exit 0 = clean. Non-zero = one finding printed per line on stderr/stdout.
 
 set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
-  echo "usage: check-spec.sh <harness-root> <slug>" >&2
+  echo "usage: check-spec.sh <root> <slug>" >&2
   exit 2
 fi
 
 ROOT="${1%/}"
 SLUG="$2"
 FINDINGS=0
+LAYOUT=""
 
 fail() {
   echo "FAIL: $*"
@@ -28,15 +31,21 @@ warn_missing() {
   FINDINGS=$((FINDINGS + 1))
 }
 
-SPEC_FILE="$ROOT/specs/${SLUG}.yaml"
+SPEC_FILE=""
 PRD=""
 STATIC=""
 COMMANDS=""
 CONTRACT=""
 PLAYWRIGHT=""
 
-if [[ ! -f "$SPEC_FILE" ]]; then
-  fail "spec file missing: $SPEC_FILE"
+if [[ -f "$ROOT/specs/${SLUG}.yaml" ]]; then
+  LAYOUT="run"
+  SPEC_FILE="$ROOT/specs/${SLUG}.yaml"
+elif [[ -f "$ROOT/.harness/spec.yaml" ]]; then
+  LAYOUT="extend"
+  SPEC_FILE="$ROOT/.harness/spec.yaml"
+else
+  fail "spec file missing: expected $ROOT/specs/${SLUG}.yaml or $ROOT/.harness/spec.yaml"
   exit 1
 fi
 
@@ -67,20 +76,20 @@ fi
 
 STATIC_REL="$(yaml_scalar "$SPEC_FILE" "static" || true)"
 # validators.static is nested; also try after validators: block
-if [[ -z "$STATIC_REL" ]] || [[ "$STATIC_REL" != validators/* ]]; then
+if [[ -z "$STATIC_REL" ]] || { [[ "$STATIC_REL" != validators/* ]] && [[ "$STATIC_REL" != .harness/* ]]; }; then
   STATIC_REL="$(grep -E '^[[:space:]]*static:[[:space:]]*' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | head -1 | sed -E 's/^[[:space:]]*static:[[:space:]]*//; s/[\"'\'']//g; s/[[:space:]]*$//' || true)"
 fi
 if [[ -n "$STATIC_REL" ]]; then
   STATIC="$ROOT/$STATIC_REL"
 fi
 
-COMMANDS_REL="$(grep -E '^[[:space:]]*commands:[[:space:]]*validators/' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | head -1 | sed -E 's/^[[:space:]]*commands:[[:space:]]*//; s/[\"'\'']//g; s/[[:space:]]*$//' || true)"
+COMMANDS_REL="$(grep -E '^[[:space:]]*commands:[[:space:]]*(validators/|\.harness/)' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | head -1 | sed -E 's/^[[:space:]]*commands:[[:space:]]*//; s/[\"'\'']//g; s/[[:space:]]*$//' || true)"
 if [[ -n "$COMMANDS_REL" ]]; then
   COMMANDS="$ROOT/$COMMANDS_REL"
 fi
 
 CONTRACT_REL="$(yaml_scalar "$SPEC_FILE" "contract" || true)"
-if [[ -n "$CONTRACT_REL" ]] && [[ "$CONTRACT_REL" == contracts/* ]]; then
+if [[ -n "$CONTRACT_REL" ]] && { [[ "$CONTRACT_REL" == contracts/* ]] || [[ "$CONTRACT_REL" == .harness/* ]]; }; then
   CONTRACT="$ROOT/$CONTRACT_REL"
 fi
 
@@ -97,28 +106,37 @@ if [[ "$SPEC_NAME" != "$SLUG" ]]; then
 fi
 
 TM_NAME="$(grep -A5 '^templateMetadata:' "$SPEC_FILE" | grep -E '^[[:space:]]*name:' | head -1 | sed -E 's/^[[:space:]]*name:[[:space:]]*//; s/[\"'\'']//g; s/[[:space:]]*$//' || true)"
-if [[ -n "$TM_NAME" ]] && [[ "$TM_NAME" != "$SLUG" ]]; then
-  fail "templateMetadata.name='$TM_NAME' does not match slug='$SLUG'"
-fi
 
-if [[ -n "$PRD_REL" ]] && [[ "$PRD_REL" != *"$SLUG"* ]]; then
-  fail "prd path '$PRD_REL' does not contain slug='$SLUG'"
-fi
+if [[ "$LAYOUT" == "run" ]]; then
+  if [[ -n "$TM_NAME" ]] && [[ "$TM_NAME" != "$SLUG" ]]; then
+    fail "templateMetadata.name='$TM_NAME' does not match slug='$SLUG'"
+  fi
 
-if [[ -n "$STATIC" ]] && [[ -f "$STATIC" ]]; then
-  if ! grep -q "\"equals\": \"$SLUG\"" "$STATIC" && ! grep -q "\"equals\": \"$SLUG\"" "$STATIC"; then
-    # also accept equals without space
+  if [[ -n "$PRD_REL" ]] && [[ "$PRD_REL" != *"$SLUG"* ]]; then
+    fail "prd path '$PRD_REL' does not contain slug='$SLUG'"
+  fi
+
+  if [[ -n "$STATIC" ]] && [[ -f "$STATIC" ]]; then
     if ! grep -E "\"equals\"[[:space:]]*:[[:space:]]*\"${SLUG}\"" "$STATIC" >/dev/null; then
       fail "static validator missing template.json name equals '$SLUG'"
     fi
+  elif [[ -n "$STATIC_REL" ]]; then
+    warn_missing "static validator missing: $STATIC"
   fi
-elif [[ -n "$STATIC_REL" ]]; then
-  warn_missing "static validator missing: $STATIC"
-fi
 
-if [[ -n "$CONTRACT" ]] && [[ -f "$CONTRACT" ]]; then
-  if ! grep -E "\"template\"[[:space:]]*:[[:space:]]*\"${SLUG}\"" "$CONTRACT" >/dev/null; then
-    fail "oracle template field does not equal slug='$SLUG'"
+  if [[ -n "$CONTRACT" ]] && [[ -f "$CONTRACT" ]]; then
+    if ! grep -E "\"template\"[[:space:]]*:[[:space:]]*\"${SLUG}\"" "$CONTRACT" >/dev/null; then
+      fail "oracle template field does not equal slug='$SLUG'"
+    fi
+  fi
+else
+  # Extend: templateMetadata.name is host identity; may differ from extension slug.
+  # Static / oracle often omit template.json name equals — skip those checks.
+  if [[ -n "$STATIC_REL" ]] && [[ ! -f "$STATIC" ]]; then
+    warn_missing "static validator missing: $STATIC"
+  fi
+  if [[ -n "$CONTRACT_REL" ]] && [[ ! -f "$CONTRACT" ]]; then
+    warn_missing "oracle missing: $CONTRACT"
   fi
 fi
 
@@ -147,6 +165,18 @@ elif [[ -n "$COMMANDS_REL" ]]; then
   warn_missing "command validator missing: $COMMANDS"
 else
   fail "could not resolve validators.commands path from spec file"
+fi
+
+# --- extend.baseline (extend layout only) ------------------------------------
+
+if [[ "$LAYOUT" == "extend" ]]; then
+  if ! has_active "$SPEC_FILE" '^[[:space:]]*extend:'; then
+    fail "extend layout requires an extend: block"
+  elif ! grep -A20 -E '^[[:space:]]*extend:' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | grep -E '^[[:space:]]*baseline:' >/dev/null; then
+    fail "extend layout requires extend.baseline"
+  elif ! grep -A40 -E '^[[:space:]]*baseline:' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | grep -E '^[[:space:]]*-?[[:space:]]*name:[[:space:]]*install[[:space:]]*$' >/dev/null; then
+    fail "extend.baseline missing a command literally named \"install\""
+  fi
 fi
 
 # --- Tier 3 pairing: contract + validator.enabled ----------------------------
@@ -247,9 +277,9 @@ fi
 # --- summary -----------------------------------------------------------------
 
 if [[ "$FINDINGS" -gt 0 ]]; then
-  echo "check-spec: $FINDINGS finding(s)"
+  echo "check-spec: $FINDINGS finding(s) (layout=$LAYOUT)"
   exit 1
 fi
 
-echo "check-spec: OK"
+echo "check-spec: OK (layout=$LAYOUT)"
 exit 0

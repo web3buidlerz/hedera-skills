@@ -17,9 +17,12 @@ this protocol. Either way, apply the harness decision tree below.
 ### Facts to look up (do not ask)
 
 - Is this a harness clone? (`specs/`, `skeletons/new-template/`, `skills-index.json`)
-- Which generator skills exist? (read `skills-index.json`)
-- What do existing **spec files** under `specs/` do for house conventions?
-- What scripts does the scaffold-hbar seed document? (README / package.json when present)
+- Is this a scaffolded app ready for **extend**? (`.harness/spec.yaml`,
+  `packages/nextjs`, `yarn harness:extend` / `hedera-harness` in package.json)
+- Which mode fits — greenfield **run** vs in-place **extend**?
+- Which generator skills exist? (read `skills-index.json` from clone or package)
+- What do existing **spec files** under `specs/` or `.harness/` do for conventions?
+- What scripts does the host app / seed document? (README / package.json)
 
 5. Do **not** write files until the user confirms shared understanding.
 
@@ -27,35 +30,42 @@ this protocol. Either way, apply the harness decision tree below.
 
 Walk these decisions in order. Later choices depend on earlier answers.
 
-1. **Product goal** — one paragraph: what the demo is, who it is for, what
-   "done" looks like in a browser without live credentials.
-   *Recommend:* keep the first journey credential-free.
+1. **Mode** — **run** (greenfield seed + isolated workspace) or **extend**
+   (in-place on an already-scaffolded app under `.harness/`).
+   *Recommend:* **extend** when cwd is already a Scaffold HBAR app; **run**
+   when authoring inside a harness clone or building a new template from seed.
 
-2. **Slug** — kebab-case name for paths and the slug map.
-   *Recommend:* short product noun (`proof-wall`, `x402-metered-api`).
+2. **Product goal** — one paragraph: what the demo / extension is, who it is
+   for, what "done" looks like in a browser without live credentials.
+   *Recommend:* keep the first journey credential-free. For **extend**, phrase
+   the delta against the existing app (what stays, what is added).
 
-3. **Solidity in scope?** — yes / no.
+3. **Slug** — kebab-case name for the **spec file** `name` and classic paths.
+   *Recommend:* short product noun (`proof-wall`, `x402-pay-to-post`). For
+   **extend**, `templateMetadata.name` may stay as the host template id.
+
+4. **Solidity in scope?** — yes / no.
    - Yes → Hardhat/Foundry workspaces allowed; consider `hts-system-contract`
      (and deploy/`chainValidation` later).
    - No → forbid Hardhat/Foundry workspaces in the **spec file**; prefer native
      service skills (`hedera-consensus-service`, `hedera-token-service`).
 
-4. **Hedera services** — HCS, HTS, HSS, precompiles, mirror reads, …
+5. **Hedera services** — HCS, HTS, HSS, precompiles, mirror reads, …
    *Recommend:* map each service to a generator skill name from
    `skills-index.json`.
 
-5. **Routes** — at least `/`, plus any secondary paths.
+6. **Routes** — at least `/`, plus any secondary paths.
    *Recommend:* only routes the first green run will actually ship.
 
-6. **Wallet-gated writes?** — which journeys need a wallet?
+7. **Wallet-gated writes?** — which journeys need a wallet?
    - Read-only / affordance-only → gates 0–3 are enough; keep gate 3.5 commented.
    - Real on-chain writes must be graded → gate 3.5 + `executableWithTestSigner`
      become meaningful (still opt-in; confirm explicitly).
 
-7. **Gate ambition for the first green run** — default **gate 0–1 only**.
+8. **Gate ambition for the first green run** — default **gate 0–1 only**.
    Offer 2 / 3 / 3.5 only after the user opts in. Ambition decides which files
    get filled vs left as commented stubs.
 
-8. **Confirm shared understanding** — summarize the decisions (slug, services,
-   routes, Solidity, gates, generator skills). Wait for an explicit go-ahead
-   before emitting files.
+9. **Confirm shared understanding** — summarize the decisions (mode, slug,
+   services, routes, Solidity, gates, generator skills). Wait for an explicit
+   go-ahead before emitting files.

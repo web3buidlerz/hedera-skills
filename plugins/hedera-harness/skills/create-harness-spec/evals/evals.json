@@ -58,6 +58,50 @@
       ]
     },
     {
+      "id": 3,
+      "prompt": "I already scaffolded a Scaffold HBAR hedera-demo app (packages/nextjs present). Help me create an in-place extend harness spec under .harness/ for adding a public Learn page. No Solidity. Gate 0-1 only.",
+      "expected_output": "A grilling session that picks extend mode, waits for shared understanding, then emits .harness/prd.md, .harness/spec.yaml (no seed, with extend.baseline), .harness/validators/static.json, .harness/validators/yarn.json, and hands off yarn harness:extend or hedera-harness extend.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "chooses-extend-mode",
+          "type": "regex",
+          "value": "(extend|\\.harness/|in-place)",
+          "description": "Chooses extend / .harness layout"
+        },
+        {
+          "name": "waits-for-shared-understanding",
+          "type": "regex",
+          "value": "(shared understanding|confirm|go-ahead|before (writing|emitting|creating))",
+          "description": "Does not write files until shared understanding is confirmed"
+        },
+        {
+          "name": "emits-harness-dir-paths",
+          "type": "regex",
+          "value": "\\.harness/(spec\\.yaml|prd\\.md|validators/)",
+          "description": "Emits files under .harness/"
+        },
+        {
+          "name": "includes-extend-baseline",
+          "type": "contains",
+          "value": "extend.baseline",
+          "description": "Mentions or includes extend.baseline"
+        },
+        {
+          "name": "omits-seed-or-notes-no-seed",
+          "type": "regex",
+          "value": "(no seed|omit.*seed|without seed|No seed)",
+          "description": "Notes that extend has no seed"
+        },
+        {
+          "name": "hands-off-extend-cli",
+          "type": "regex",
+          "value": "(harness:extend|hedera-harness extend)",
+          "description": "Hands off to extend CLI / yarn script"
+        }
+      ]
+    },
+    {
       "id": 1,
       "prompt": "Deepen my existing proof-wall harness spec to gate 3. Derive acceptance contract assertions from the PRD journeys (browse without wallet; wallet-gated post). Keep the run blind.",
       "expected_output": "An oracle with C1/C2/... assertions, evaluationRules fail-closed posture, and instructions to uncomment contract + validator in the spec file — without mirroring assertion text into the PRD.",

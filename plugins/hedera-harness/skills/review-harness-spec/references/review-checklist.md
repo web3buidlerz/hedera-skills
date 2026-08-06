@@ -32,16 +32,23 @@ Mark each item pass / fail / n/a.
 - [ ] **O9** Spec file `skills:` (if any) lists generator skills from `skills-index.json`
       only — never `create-harness-spec` / `review-harness-spec` / `harness-spec-anatomy`
 
-## Seed and secrets (judgment)
+## Seed / extend and secrets (judgment)
 
 - [ ] **O10** No real private keys or account ids in any spec file
 - [ ] **O11** `secretScan` / forbidden `.env` paths present for scaffold-hbar templates
-- [ ] **O12** `seed.repo` / `seed.ref` sensible; `isolation.neverModifySeedRepo: true`
-      when using a shared seed
+- [ ] **O12** **run:** `seed.repo` / `seed.ref` sensible; `isolation.neverModifySeedRepo: true`
+      when using a shared seed. **extend:** no `seed` block; workspace is the project cwd
 - [ ] **O13** Command timeouts are generous enough for cold CI (install ≥ 300s typical);
       `requiresNoSecrets: true` (or equivalent)
+- [ ] **O14** **extend:** `extend.baseline` lists host-health commands with a literal
+      `"install"` name; baseline is separate from post-extension `validators.commands`
+- [ ] **O15** **extend:** `requiredFiles` include `.harness/spec.yaml` / `.harness/prd.md`
+      (and contract when gate 3); `templateMetadata.name` may differ from the extension
+      slug (host template identity)
 
 ## Quick oracle-blocker shortlist
 
 Fail the review as not-runnable if **O1**, **O2**, or **O10** fail (plus any
-Wiring blockers from `check-spec.sh`).
+Wiring blockers from `check-spec.sh`). For **extend**, also treat missing
+`extend.baseline` / baseline `"install"` as a Wiring blocker (covered by
+`check-spec.sh`).

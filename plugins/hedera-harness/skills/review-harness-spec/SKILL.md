@@ -16,18 +16,25 @@ Authoring-only skill. The **spec file** `skills:` list carries generator skills.
 
 ## Step 1: Locate the spec
 
-Ask for the **slug** (or infer from open files). Resolve paths relative to the
-harness clone root (or the user-chosen root) using the file table in
-`harness-spec-anatomy`. Read every file that exists. If the **spec file** is
-missing, stop and ask.
+Ask for the **slug** (or infer from open files). Detect layout:
+
+- **run:** `specs/<slug>.yaml` under a harness clone root
+- **extend:** `.harness/spec.yaml` under a scaffolded project root
+  (`name:` must match the slug)
+
+Resolve paths using the file tables in `harness-spec-anatomy`. Read every file
+that exists. If the **spec file** is missing, stop and ask.
 
 ## Step 2: Wiring axis
 
 Run the anatomy script (resolve path relative to the installed skill):
 
 ```bash
-bash <path-to>/harness-spec-anatomy/scripts/check-spec.sh <harness-root> <slug>
+bash <path-to>/harness-spec-anatomy/scripts/check-spec.sh <root> <slug>
 ```
+
+`<root>` is the harness clone (run) or the project root that contains
+`.harness/` (extend).
 
 Report its findings **verbatim** under `## Wiring`. If the script is missing,
 fall back to the slug map, gate pairing rules, and **blind** checks in
@@ -44,6 +51,8 @@ Judgment only — what a script cannot see. Work through
 - **Needles** pin real yarn scripts, not brittle implementation strings
 - Playwright **gate** stays thin; deep UX lives in the **oracle**
 - Generator `skills:` list is appropriate (no authoring skills)
+- For **extend**: no seed / isolation assumptions; `extend.baseline` present;
+  `requiredFiles` include `.harness/*` when appropriate
 
 Report under `## Oracle`. Do **not** merge or rerank with Wiring — a **spec**
 can be perfectly wired and still grade the wrong thing.
@@ -54,6 +63,7 @@ can be perfectly wired and still grade the wrong thing.
 # Harness Spec Review — <slug>
 
 ## Summary
+- **Layout**: run | extend
 - **Gate ambition**: 0–1 | +2 | +3 | +3.5
 - **Ready to run gate 0–1?**: yes / no
 - **Wiring findings**: N
@@ -72,14 +82,19 @@ can be perfectly wired and still grade the wrong thing.
 
 ## Suggested next commands
 ```bash
+# run layout:
 npm run harness -- validate specs/<slug>.yaml --workspace runs/<id>/workspace
-# or, when Wiring is clean and Oracle has no blockers:
 npm run harness -- run specs/<slug>.yaml --max-attempts 3
+
+# extend layout:
+hedera-harness validate .harness/spec.yaml --workspace .
+yarn harness:extend
+# artifacts: .harness/runs/<id>/
 ```
 ```
 
 Be constructive: every finding needs a concrete fix. Prefer fixing Wiring and
-Oracle blockers before suggesting a full `run`.
+Oracle blockers before suggesting a full `run` / `extend`.
 
 ## Additional resources
 
