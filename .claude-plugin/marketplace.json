@@ -31,14 +31,14 @@
     },
     {
       "name": "native-services-js",
-      "description": "Guides for Hedera Token Service and Consensus Service using the Hiero JavaScript SDK",
+      "description": "Guides for Hedera Token Service, Consensus Service, and x402 pay-per-use HBAR payments using the Hiero JS SDK and @x402/hedera",
       "version": "1.0.0",
       "author": {
         "name": "Hedera Dev"
       },
       "source": "./plugins/native-services-js",
       "category": "development",
-      "keywords": ["hedera", "hts", "hcs", "tokens", "consensus", "javascript", "hiero-sdk"]
+      "keywords": ["hedera", "hts", "hcs", "tokens", "consensus", "javascript", "hiero-sdk", "x402", "payments"]
     },
     {
       "name": "hackathon-helper",
