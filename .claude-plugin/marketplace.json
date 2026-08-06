@@ -30,6 +30,17 @@
       "keywords": ["hedera", "hts", "hss", "tokens", "solidity", "smart-contracts", "schedule-service"]
     },
     {
+      "name": "cross-chain",
+      "description": "Cross-chain interoperability patterns for Hedera — Axelar GMP send/receive, gas payment, and bridge wiring to EVM destinations",
+      "version": "1.0.0",
+      "author": {
+        "name": "Hedera Dev"
+      },
+      "source": "./plugins/cross-chain",
+      "category": "development",
+      "keywords": ["hedera", "axelar", "gmp", "cross-chain", "bridge", "interop", "solidity"]
+    },
+    {
       "name": "native-services-js",
       "description": "Guides for Hedera Token Service and Consensus Service using the Hiero JavaScript SDK",
       "version": "1.0.0",
