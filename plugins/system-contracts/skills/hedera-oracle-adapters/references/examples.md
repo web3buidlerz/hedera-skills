@@ -1,6 +1,6 @@
 # Oracle Adapter Examples
 
-Condensed patterns extracted from the Scaffold-HBAR `templates/oracles` Foundry package. Prefer the template’s full contracts for production copy-paste.
+Generic libs and read patterns for Hedera `IPriceOracle` adapters. Prefer a concrete project template for full contract copy-paste.
 
 ## Shared libs
 
@@ -49,7 +49,7 @@ library AssetConversionLib {
 }
 ```
 
-## Decimal normalization helper
+## Decimal normalization
 
 ```solidity
 uint8 constant NORMALIZED_DECIMALS = 18;
@@ -63,145 +63,53 @@ function normalizeToE18(uint256 amount, uint8 decimals) pure returns (uint256) {
 }
 ```
 
-## Chainlink adapter skeleton
+## Chainlink read sketch
 
 ```solidity
-import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+(uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) =
+    feed.latestRoundData();
 
-contract ChainlinkPriceOracleAdapter is IPriceOracle {
-    mapping(bytes32 => AggregatorV3Interface) private feeds;
-    bytes32 public immutable PROVIDER_KEY;
-    uint256 public immutable MAX_STALENESS;
-
-    struct FeedConfig {
-        bytes32 pairKey;
-        address feed;
-    }
-
-    constructor(FeedConfig[] memory configs, uint256 maxStaleness_) {
-        require(configs.length != 0);
-        PROVIDER_KEY = ProviderLib.CHAINLINK;
-        MAX_STALENESS = maxStaleness_;
-        for (uint256 i; i < configs.length; ++i) {
-            require(configs[i].pairKey != bytes32(0) && configs[i].feed != address(0));
-            require(address(feeds[configs[i].pairKey]) == address(0));
-            feeds[configs[i].pairKey] = AggregatorV3Interface(configs[i].feed);
-        }
-    }
-
-    function latestPrice(bytes32 pairKey) external view returns (PriceData memory) {
-        AggregatorV3Interface feed = feeds[pairKey];
-        if (address(feed) == address(0)) revert OracleUnsupportedPair(pairKey);
-
-        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) =
-            feed.latestRoundData();
-
-        if (answeredInRound < roundId || updatedAt == 0) revert OracleIncompleteRound();
-        if (answer <= 0) revert OracleInvalidPrice();
-        if (block.timestamp - updatedAt > MAX_STALENESS) {
-            revert OracleStalePrice(updatedAt, MAX_STALENESS);
-        }
-
-        return PriceData({
-            pairKey: pairKey,
-            providerKey: PROVIDER_KEY,
-            priceE18: normalizeToE18(uint256(answer), feed.decimals()),
-            updatedAt: updatedAt
-        });
-    }
+if (answeredInRound < roundId || updatedAt == 0) revert OracleIncompleteRound();
+if (answer <= 0) revert OracleInvalidPrice();
+if (block.timestamp - updatedAt > MAX_STALENESS) {
+    revert OracleStalePrice(updatedAt, MAX_STALENESS);
 }
+
+uint256 priceE18 = normalizeToE18(uint256(answer), feed.decimals());
 ```
 
-## Supra adapter skeleton
+Constructor config shape: `pairKey → feed address` (immutable after deploy).
+
+## Supra read sketch
 
 ```solidity
-interface ISupraSValueFeed {
-    struct PriceFeed {
-        uint256 round;
-        uint256 decimals;
-        uint256 time;
-        uint256 price;
-    }
+ISupraSValueFeed.PriceFeed memory pf = SUPRA_ORACLE.getSvalue(supraPairIds[pairKey]);
+if (pf.time == 0) revert OracleIncompleteRound();
+if (pf.price == 0) revert OracleInvalidPrice();
 
-    function getSvalue(uint256 pairIndex) external view returns (PriceFeed memory);
+uint256 updatedAt = pf.time > 10_000_000_000 ? pf.time / 1_000 : pf.time;
+if (block.timestamp - updatedAt > MAX_STALENESS) {
+    revert OracleStalePrice(updatedAt, MAX_STALENESS);
 }
 
-contract SupraPriceOracleAdapter is IPriceOracle {
-    ISupraSValueFeed public immutable SUPRA_ORACLE;
-    mapping(bytes32 => uint256) private supraPairIds;
-    mapping(bytes32 => bool) private configured;
-
-    struct PairConfig {
-        bytes32 pairKey;
-        uint256 supraPairId;
-    }
-
-    constructor(address supraOracle_, PairConfig[] memory configs, uint256 maxStaleness_) {
-        require(supraOracle_ != address(0) && configs.length != 0);
-        SUPRA_ORACLE = ISupraSValueFeed(supraOracle_);
-        // set PROVIDER_KEY = ProviderLib.SUPRA, MAX_STALENESS, configure pairs…
-    }
-
-    function latestPrice(bytes32 pairKey) external view returns (PriceData memory) {
-        if (!configured[pairKey]) revert OracleUnsupportedPair(pairKey);
-
-        ISupraSValueFeed.PriceFeed memory pf = SUPRA_ORACLE.getSvalue(supraPairIds[pairKey]);
-        if (pf.time == 0) revert OracleIncompleteRound();
-        if (pf.price == 0) revert OracleInvalidPrice();
-
-        uint256 updatedAt = pf.time > 10_000_000_000 ? pf.time / 1_000 : pf.time;
-        if (block.timestamp - updatedAt > MAX_STALENESS) {
-            revert OracleStalePrice(updatedAt, MAX_STALENESS);
-        }
-
-        return PriceData({
-            pairKey: pairKey,
-            providerKey: PROVIDER_KEY,
-            priceE18: normalizeToE18(pf.price, uint8(pf.decimals)),
-            updatedAt: updatedAt
-        });
-    }
-}
+uint256 priceE18 = normalizeToE18(pf.price, uint8(pf.decimals));
 ```
 
-## Pyth adapter skeleton
+Constructor config shape: push-oracle address + `pairKey → supraPairId`.
+
+## Pyth read / update sketch
 
 ```solidity
-import { IPyth } from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
-import { PythStructs } from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
-
-contract PythPriceOracleAdapter is IPriceOracle {
-    IPyth public immutable PYTH;
-    mapping(bytes32 => bytes32) private priceIds;
-
-    struct PriceConfig {
-        bytes32 pairKey;
-        bytes32 priceId;
-    }
-
-    function updatePrice(bytes[] calldata updateData) external payable {
-        uint256 fee = PYTH.getUpdateFee(updateData);
-        if (msg.value < fee) revert PythUpdateFeeTooLow(msg.value, fee);
-        PYTH.updatePriceFeeds{ value: msg.value }(updateData);
-    }
-
-    function latestPrice(bytes32 pairKey) external view returns (PriceData memory) {
-        bytes32 priceId = priceIds[pairKey];
-        if (priceId == bytes32(0)) revert OracleUnsupportedPair(pairKey);
-
-        PythStructs.Price memory price = PYTH.getPriceNoOlderThan(priceId, MAX_STALENESS);
-        if (price.publishTime == 0) revert OracleIncompleteRound();
-        if (price.price <= 0) revert OracleInvalidPrice();
-        if (price.conf > uint64(price.price)) revert PythInvalidConfidence();
-
-        return PriceData({
-            pairKey: pairKey,
-            providerKey: PROVIDER_KEY,
-            priceE18: normalizePythToE18(price.price, price.expo),
-            updatedAt: price.publishTime
-        });
-    }
+function updatePrice(bytes[] calldata updateData) external payable {
+    uint256 fee = PYTH.getUpdateFee(updateData);
+    if (msg.value < fee) revert PythUpdateFeeTooLow(msg.value, fee);
+    PYTH.updatePriceFeeds{ value: msg.value }(updateData);
 }
+
+PythStructs.Price memory price = PYTH.getPriceNoOlderThan(priceId, MAX_STALENESS);
+if (price.publishTime == 0) revert OracleIncompleteRound();
+if (price.price <= 0) revert OracleInvalidPrice();
+if (price.conf > uint64(price.price)) revert PythInvalidConfidence();
 ```
 
 Pyth exponent normalization (signed `expo`):
@@ -218,55 +126,15 @@ function normalizePythToE18(int64 price, int32 expo) pure returns (uint256) {
 }
 ```
 
-## OracleConsumer skeleton
+Constructor config shape: Pyth contract + `pairKey → bytes32 priceId`.
+
+## Consumer conversion
 
 ```solidity
-contract OracleConsumer is Ownable {
-    IPriceOracle public oracle;
-
-    constructor(address oracle_, address initialOwner) Ownable(initialOwner) {
-        _setOracle(oracle_);
-    }
-
-    function setOracle(address newOracle) external onlyOwner {
-        _setOracle(newOracle);
-    }
-
-    function baseToQuote(
-        bytes32 pairKey,
-        uint256 baseAmount,
-        uint8 baseDecimals,
-        uint8 quoteDecimals
-    ) external view returns (uint256) {
-        IPriceOracle.PriceData memory data = oracle.latestPrice(pairKey);
-        return AssetConversionLib.baseToQuote(baseAmount, baseDecimals, quoteDecimals, data.priceE18);
-    }
-
-    function quoteToBase(
-        bytes32 pairKey,
-        uint256 quoteAmount,
-        uint8 baseDecimals,
-        uint8 quoteDecimals
-    ) external view returns (uint256) {
-        IPriceOracle.PriceData memory data = oracle.latestPrice(pairKey);
-        return AssetConversionLib.quoteToBase(quoteAmount, baseDecimals, quoteDecimals, data.priceE18);
-    }
-
-    function _setOracle(address newOracle) private {
-        require(newOracle != address(0));
-        oracle = IPriceOracle(newOracle);
-    }
-}
+IPriceOracle.PriceData memory data = oracle.latestPrice(pairKey);
+uint256 quoteAmount = AssetConversionLib.baseToQuote(
+    baseAmount, baseDecimals, quoteDecimals, data.priceE18
+);
 ```
 
-## Deploy script shape
-
-```solidity
-FeedConfig[] memory configs = new FeedConfig[](3);
-configs[0] = FeedConfig({ pairKey: PairLib.pairKey("HBAR", "USD"), feed: hbarUsdFeed });
-configs[1] = FeedConfig({ pairKey: PairLib.pairKey("BTC", "USD"), feed: btcUsdFeed });
-configs[2] = FeedConfig({ pairKey: PairLib.pairKey("ETH", "USD"), feed: ethUsdFeed });
-
-ChainlinkPriceOracleAdapter adapter =
-    new ChainlinkPriceOracleAdapter(configs, /* maxStaleness */ 1 hours);
-```
+Ownable `setOracle(address)` switches providers without redeploying business logic.

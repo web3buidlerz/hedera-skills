@@ -3,7 +3,7 @@ name: hedera-oracle-adapters
 description: >
   Hedera price oracle adapters. Use when integrating Chainlink, Supra, or Pyth price feeds on
   Hedera (testnet 296 / mainnet 295), implementing IPriceOracle, normalizing prices to 18 decimals,
-  building OracleConsumer conversion flows, or switching provider adapters via setOracle.
+  building consumer conversion flows, or switching provider adapters via setOracle.
 ---
 
 # Hedera Oracle Adapters
@@ -14,7 +14,7 @@ description: >
 Provider feed -> Multi-pair provider adapter -> Consumer
 ```
 
-Switch providers by deploying another adapter and calling `OracleConsumer.setOracle(newAdapter)`.
+Switch providers by deploying another adapter and pointing the consumer at it (`setOracle`).
 
 ## Quick Reference
 
@@ -22,14 +22,14 @@ Switch providers by deploying another adapter and calling `OracleConsumer.setOra
 | ------- | ---- |
 | Interface | `IPriceOracle.latestPrice(bytes32 pairKey) → PriceData` |
 | Price scale | Always **18 decimals** (`priceE18`) |
-| Pair key | `keccak256(abi.encode(BASE, QUOTE))` via `PairLib` — uppercase symbols (`HBAR`, `USD`) |
-| Provider key | `keccak256("CHAINLINK" \| "SUPRA" \| "PYTH")` via `ProviderLib` |
+| Pair key | `keccak256(abi.encode(BASE, QUOTE))` — uppercase symbols (`HBAR`, `USD`) |
+| Provider key | `keccak256("CHAINLINK" \| "SUPRA" \| "PYTH")` |
 | Freshness | Each adapter enforces `MAX_STALENESS`; stale reads **revert** |
 | Config | Constructor-only pair maps; no post-deploy pair edits |
 
 **Hedera chain IDs:** testnet `296`, mainnet `295`.
 
-See [references/hedera-feeds.md](references/hedera-feeds.md) for feed / pair / price IDs. See [references/examples.md](references/examples.md) for full adapter and consumer snippets.
+See [references/examples.md](references/examples.md) for libs and read patterns. See [references/hedera-feeds.md](references/hedera-feeds.md) for where to source feed / pair / price IDs.
 
 ## Critical: Normalize And Revert
 
@@ -67,7 +67,7 @@ bytes32 constant SUPRA     = keccak256("SUPRA");
 bytes32 constant PYTH      = keccak256("PYTH");
 ```
 
-## Provider Adapters
+## Provider Quirks
 
 Deploy **one adapter contract per provider**. Each supports multiple pairs in one deployment.
 
@@ -77,44 +77,14 @@ Deploy **one adapter contract per provider**. Each supports multiple pairs in on
 - Read: `latestRoundData()` — require `answeredInRound >= roundId`, `updatedAt != 0`, `answer > 0`
 - Normalize feed decimals → 18
 
-```solidity
-contract ChainlinkPriceOracleAdapter is IPriceOracle {
-    struct FeedConfig { bytes32 pairKey; address feed; }
-
-    constructor(FeedConfig[] memory feedConfigs, uint256 maxStaleness_) { /* set feeds */ }
-
-    function latestPrice(bytes32 pairKey) external view returns (PriceData memory data) {
-        AggregatorV3Interface feed = feeds[pairKey];
-        if (address(feed) == address(0)) revert OracleUnsupportedPair(pairKey);
-
-        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) =
-            feed.latestRoundData();
-
-        if (answeredInRound < roundId || updatedAt == 0) revert OracleIncompleteRound();
-        if (answer <= 0) revert OracleInvalidPrice();
-        if (block.timestamp - updatedAt > MAX_STALENESS) {
-            revert OracleStalePrice(updatedAt, MAX_STALENESS);
-        }
-
-        return PriceData({
-            pairKey: pairKey,
-            providerKey: PROVIDER_KEY,
-            priceE18: _normalizeToE18(uint256(answer), feed.decimals()),
-            updatedAt: updatedAt
-        });
-    }
-}
-```
-
 ### Supra (push S-Value)
 
 - Map: `pairKey → supraPairId` (+ immutable push-oracle address)
-- Read: `ISupraSValueFeed.getSvalue(pairId)`
+- Read: `getSvalue(pairId)`
 - **Hedera quirk:** Supra timestamps are often **milliseconds** — convert to seconds when `time > 1e10`
-- **Hedera quirk:** current feeds are **USDT** pairs (not USD)
+- **Hedera quirk:** current feeds are often **USDT** pairs (not USD) — pair keys must match (`HBAR`/`USDT`)
 
 ```solidity
-ISupraSValueFeed.PriceFeed memory pf = SUPRA_ORACLE.getSvalue(supraPairIds[pairKey]);
 uint256 updatedAt = pf.time > 10_000_000_000 ? pf.time / 1_000 : pf.time;
 ```
 
@@ -122,7 +92,7 @@ uint256 updatedAt = pf.time > 10_000_000_000 ? pf.time / 1_000 : pf.time;
 
 - Map: `pairKey → bytes32 priceId`
 - **Pull model:** call payable `updatePrice(updateData)` with Hermes payloads **before** reads when stale
-- Read: `PYTH.getPriceNoOlderThan(priceId, MAX_STALENESS)`
+- Read: `getPriceNoOlderThan(priceId, MAX_STALENESS)`
 - Reject when `conf > uint64(price)` (confidence wider than price)
 - Normalize signed price + `expo` → 18 decimals
 
@@ -136,26 +106,13 @@ function updatePrice(bytes[] calldata updateData) external payable {
 
 ## Consumer Pattern
 
-Keep business logic on a thin consumer that holds one `IPriceOracle` and converts with `AssetConversionLib`:
+Keep business logic on a thin consumer that holds one `IPriceOracle` and converts with shared math:
 
 ```solidity
-contract OracleConsumer is Ownable {
-    IPriceOracle public oracle;
-
-    function setOracle(address newOracle) external onlyOwner { /* ... */ }
-
-    function baseToQuote(
-        bytes32 pairKey,
-        uint256 baseAmount,
-        uint8 baseDecimals,
-        uint8 quoteDecimals
-    ) external view returns (uint256 quoteAmount) {
-        IPriceOracle.PriceData memory data = oracle.latestPrice(pairKey);
-        return AssetConversionLib.baseToQuote(
-            baseAmount, baseDecimals, quoteDecimals, data.priceE18
-        );
-    }
-}
+IPriceOracle.PriceData memory data = oracle.latestPrice(pairKey);
+return AssetConversionLib.baseToQuote(
+    baseAmount, baseDecimals, quoteDecimals, data.priceE18
+);
 ```
 
 Conversion (rounds down via `Math.mulDiv`):
@@ -165,17 +122,18 @@ quoteAmount = baseAmount * 10^quoteDecimals / 10^baseDecimals * priceE18 / 1e18
 baseAmount  = quoteAmount * 10^baseDecimals / 10^quoteDecimals * 1e18 / priceE18
 ```
 
+Switch later with `setOracle(newAdapter)` — no consumer redeploy.
+
 ## Deployment Flow
 
-1. Deploy provider adapter (`DeployChainlinkOracle` / `DeploySupraOracle` / `DeployPythOracle`)
-2. Deploy `OracleConsumer` once with the chosen adapter
-3. Switch later with `setOracle` (or `SetConsumerOracle` script) — no consumer redeploy
-
-Store network-specific addresses and IDs in a `HelperConfig` (chainId → feeds / pair IDs / price IDs). Unsupported chain IDs should revert.
+1. Store network-specific feed addresses / pair IDs / price IDs in a config helper (chainId → configs). Unsupported chain IDs should revert.
+2. Deploy one provider adapter with its constructor config array
+3. Deploy (or point) a consumer at the chosen adapter
+4. Switch providers later with `setOracle`
 
 ## Adding A Pair
 
-1. Add feed / pair ID / price ID to `HelperConfig` for the target network
+1. Add feed / pair ID / price ID to the network config for the target chain
 2. Include the pair in the adapter deploy script’s config array
 3. Redeploy the adapter (constructor-only config) and point the consumer at it
 
@@ -193,9 +151,8 @@ When implementing or reviewing oracle code on Hedera:
 
 ## References
 
-- [references/examples.md](references/examples.md) — condensed adapter / consumer implementations
-- [references/hedera-feeds.md](references/hedera-feeds.md) — Hedera testnet/mainnet addresses and IDs
+- [references/examples.md](references/examples.md) — PairLib, conversion, provider read sketches
+- [references/hedera-feeds.md](references/hedera-feeds.md) — where to source Hedera feed / pair / price IDs
 - [Chainlink Data Feeds](https://docs.chain.link/data-feeds)
 - [Supra push oracle networks](https://docs.supra.com/oracles/data-feeds/push-oracle/networks)
-- [Pyth Price Feeds](https://docs.pyth.network/price-feeds/price-feeds)
-- Source template: [scaffold-hbar `templates/oracles`](https://github.com/hedera-dev/scaffold-hbar/tree/templates/oracles)
+- [Pyth Price Feeds](https://docs.pyth.network/price-feeds)
