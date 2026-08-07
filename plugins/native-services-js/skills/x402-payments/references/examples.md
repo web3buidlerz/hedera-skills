@@ -1,36 +1,6 @@
-# x402 Pay-Per-Use Examples
+# x402 Payment Examples
 
-Condensed patterns from Scaffold-HBAR `templates/x402-pay-per-use`. Prefer the template for production copy-paste.
-
-## FileRegistry (on-chain terms)
-
-```solidity
-string public constant PAYMENT_ASSET = "0.0.0"; // native HBAR; prices in tinybars
-
-struct FileItem {
-    address owner;
-    string payToAccountId;   // e.g. "0.0.1234"
-    uint256 priceTinybar;
-    bool isPublic;
-    string objectKey;        // private bucket key — not file bytes
-    bytes32 contentHash;     // SHA-256
-    string name;
-    string mimeType;
-    bool exists;
-}
-
-function registerFile(
-    string calldata objectKey,
-    string calldata payToAccountId,
-    uint256 priceTinybar,
-    bool isPublic,
-    bytes32 contentHash,
-    string calldata name,
-    string calldata mimeType
-) external returns (bytes32 fileId);
-```
-
-Access control for downloads is **off-chain**: the resource server reads these fields and decides free vs 402.
+Generic patterns for Hedera x402 resource servers and clients. Prefer a concrete template (e.g. Scaffold-HBAR `templates/x402-pay-per-use`) for full copy-paste wiring.
 
 ## Resource server wiring
 
@@ -57,7 +27,7 @@ paymentHeader:
   undefined;
 ```
 
-## Download route sketch (private)
+## Paid route sketch
 
 ```ts
 // 1) No payment → 402 challenge
@@ -65,17 +35,24 @@ const paymentRequiredBody = await server.buildPaymentRequiredResponse(...);
 const res = NextResponse.json(paymentRequiredBody, { status: 402 });
 res.headers.set("PAYMENT-REQUIRED", encodePaymentRequiredHeader(paymentRequiredBody));
 
-// 2) With payment → verify then settle; URL only after success
+// 2) With payment → verify then settle; resource only after success
 const verification = await server.verifyPayment(payload, matched);
 const settlement = await server.settlePayment(payload, matched);
 if (!settlement.success) {
   return NextResponse.json({ error: "Payment settlement failed" }, { status: 402 });
 }
-const response = NextResponse.json({ url: presignedUrl });
+const response = NextResponse.json({ /* resource payload */ });
 response.headers.set("PAYMENT-RESPONSE", encodePaymentResponseHeader(settlement));
 ```
 
-## Browser client retry loop
+Payment requirements typically include:
+
+- `payTo` — Hedera account id string (e.g. `0.0.1234`)
+- `amount` — tinybars as string
+- `asset` — `"0.0.0"` (native HBAR)
+- `network` — e.g. `hedera:testnet`
+
+## Client retry loop
 
 ```ts
 const httpClient = new x402HTTPClient(
@@ -92,7 +69,7 @@ if (first.status === 402) {
   const headers = httpClient.encodePaymentSignatureHeader(payload);
   const paid = await fetch(resourceUrl, { headers });
   const result = await httpClient.processResponse(paid);
-  // result.kind === "success" → body.url
+  // result.kind === "success" → paid resource body
 }
 ```
 
@@ -108,16 +85,4 @@ export function hbarToTinybar(hbar: string): bigint {
   if (fraction.length > 8) throw new Error("HBAR supports at most 8 decimal places");
   return BigInt(whole || "0") * TINYBAR_PER_HBAR + BigInt(fraction.padEnd(8, "0") || "0");
 }
-```
-
-## Deploy + infra order (template)
-
-```text
-1. yarn install
-2. Root .env — FACILITATOR_ACCOUNT_ID / FACILITATOR_PRIVATE_KEY (ECDSA, funded)
-3. packages/nextjs/.env — WalletConnect project id
-4. yarn hardhat:deploy --network hederaTestnet  # FileRegistry
-5. yarn infra:up                                 # MinIO + facilitator
-6. yarn next:dev                                 # upload / pay / download
-7. Optional: yarn x402:buy                       # CLI buyer
 ```

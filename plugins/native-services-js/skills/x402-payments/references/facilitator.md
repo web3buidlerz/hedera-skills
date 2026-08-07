@@ -1,6 +1,6 @@
 # Hedera x402 Facilitator
 
-Values and behavior from Scaffold-HBAR `templates/x402-pay-per-use` (`facilitator/` + root `docker-compose.yml`). Re-check [x402 docs](https://docs.x402.org) and [`@x402/hedera`](https://www.npmjs.com/package/@x402/hedera) for protocol updates.
+Self-hosted facilitator that verifies and settles native HBAR x402 payments. Re-check [x402 docs](https://docs.x402.org) and [`@x402/hedera`](https://www.npmjs.com/package/@x402/hedera) for protocol updates.
 
 ## Endpoints
 
@@ -11,7 +11,7 @@ Values and behavior from Scaffold-HBAR `templates/x402-pay-per-use` (`facilitato
 | `POST` | `/settle` | Co-sign as fee payer, submit to Hedera, await SUCCESS |
 | `GET` | `/health` | Liveness |
 
-Non-custodial: facilitator only adds the fee-payer signature to a transfer the buyer already authorized. It never holds file bytes or the buyer’s funds.
+Non-custodial: facilitator only adds the fee-payer signature to a transfer the buyer already authorized. It never holds protected resource bytes or the buyer’s funds.
 
 ## Environment
 
@@ -23,26 +23,17 @@ Non-custodial: facilitator only adds the fee-payer signature to a transfer the b
 | `FACILITATOR_PRIVATE_KEY` | _(required)_ | ECDSA key for co-sign + submit |
 | `HEDERA_NODE_URL` | _(optional)_ | Custom consensus endpoint |
 
-Resource server (Next.js) only needs `FACILITATOR_URL` (e.g. `http://localhost:4020`) — **not** the private key.
+The resource server only needs `FACILITATOR_URL` — **not** the private key.
 
 ## Why ECDSA + fee payer
 
-Hedera x402 uses native `TransferTransaction`s. Wallets such as HashPack partially sign (buyer → seller). Settle requires the facilitator to:
+Hedera x402 uses native `TransferTransaction`s. Wallets partially sign (buyer → seller). Settle requires the facilitator to:
 
 1. Match buyer signature to requirements (`payTo`, amount tinybars, asset `0.0.0`)
 2. Co-sign as the fee payer advertised on `/supported`
 3. Pay network fees and submit until receipt status SUCCESS
 
 Use a dedicated funded ECDSA account — not the contract deployer or seller wallet.
-
-## Docker (template)
-
-```bash
-yarn infra:up    # MinIO :9000/:9001 + facilitator :4020
-yarn infra:down
-```
-
-Compose services: `minio`, `minio-init` (private bucket), `facilitator` (build `./facilitator`).
 
 ## Packages
 
@@ -51,7 +42,7 @@ Compose services: `minio`, `minio-init` (private bucket), `facilitator` (build `
 @x402/hedera
 ```
 
-Scheme paths used by the template:
+Scheme entry points:
 
 ```text
 @x402/hedera/exact/server      # resource server
