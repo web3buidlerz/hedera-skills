@@ -1,8 +1,8 @@
 # LayerZero OFT Examples
 
-Condensed patterns from Scaffold-HBAR `templates/bridge` (`packages/foundry/contracts/layerzero` + `script/layerzero`). Prefer the template for production copy-paste.
+Generic OApp/OFT + Hedera HTS connector patterns. Prefer a concrete project template for full deploy/wire copy-paste.
 
-## Sepolia OFT
+## EVM OFT skeleton
 
 ```solidity
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
@@ -25,7 +25,7 @@ contract MyOFT is OFT {
 
 `OAppCore` does not initialize OZ Ownable — call `Ownable(_owner)` in the concrete constructor.
 
-## Hedera HTS connector OFT
+## Hedera HTS connector sketch
 
 ```solidity
 abstract contract HTSConnector is OFTCore, KeyHelper, HederaTokenService {
@@ -37,7 +37,7 @@ abstract contract HTSConnector is OFTCore, KeyHelper, HederaTokenService {
         OFTCore(HTS_DECIMALS, _lzEndpoint, _delegate)
     {
         // createFungibleToken via 0x167 with supply key = this contract
-        // store htsTokenAddress; emit TokenCreated
+        // store htsTokenAddress
     }
 
     function approvalRequired() external pure returns (bool) {
@@ -62,39 +62,33 @@ abstract contract HTSConnector is OFTCore, KeyHelper, HederaTokenService {
         return _amountLD;
     }
 }
-
-contract MyHTSConnectorOFT is HTSConnector {
-    constructor(string memory _name, string memory _symbol, address _lzEndpoint, address _delegate)
-        payable
-        HTSConnector(_name, _symbol, _lzEndpoint, _delegate)
-        Ownable(_delegate)
-    {}
-}
 ```
 
-## WireOApp (one side)
+Amounts must fit `int64`. Receiver must associate the HTS token before inbound credits.
+
+## Wire one side
 
 ```solidity
 bytes32 remotePeer = bytes32(uint256(uint160(remoteOApp)));
-IOAppCore(localOApp).setPeer(cfg.remoteEid, remotePeer);
+IOAppCore(localOApp).setPeer(remoteEid, remotePeer);
 
-IMessageLibManager ep = IMessageLibManager(cfg.endpointV2);
-ep.setSendLibrary(localOApp, cfg.remoteEid, cfg.sendUln302);
-ep.setReceiveLibrary(localOApp, cfg.remoteEid, cfg.receiveUln302, 0);
+IMessageLibManager ep = IMessageLibManager(endpointV2);
+ep.setSendLibrary(localOApp, remoteEid, sendUln302);
+ep.setReceiveLibrary(localOApp, remoteEid, receiveUln302, 0);
 
 // setConfig: ExecutorConfig (type 1) on send ULN
 // setConfig: UlnConfig (type 2) on send + receive ULN (DVN set)
 
 EnforcedOptionParam[] memory enforced = new EnforcedOptionParam[](1);
 enforced[0] = EnforcedOptionParam({
-    eid: cfg.remoteEid,
+    eid: remoteEid,
     msgType: 1,
-    options: OptionsBuilder.newOptions().addExecutorLzReceiveOption(80_000, 0)
+    options: OptionsBuilder.newOptions().addExecutorLzReceiveOption(lzReceiveGas, 0)
 });
 IOAppOptionsType3(localOApp).setEnforcedOptions(enforced);
 ```
 
-Run wiring on **both** chains (local/remote swapped).
+Run wiring on **both** chains (local/remote swapped). Verify `peers(remoteEid)` both ways.
 
 ## Send (quote + send)
 
@@ -102,11 +96,11 @@ Run wiring on **both** chains (local/remote swapped).
 using OptionsBuilder for bytes;
 
 SendParam memory sendParam = SendParam({
-    dstEid: cfg.remoteEid,
+    dstEid: remoteEid,
     to: bytes32(uint256(uint160(receiver))),
     amountLD: amountLD,
     minAmountLD: (amountLD * 9) / 10,
-    extraOptions: OptionsBuilder.newOptions().addExecutorLzReceiveOption(80_000, 0),
+    extraOptions: OptionsBuilder.newOptions().addExecutorLzReceiveOption(lzReceiveGas, 0),
     composeMsg: "",
     oftCmd: ""
 });
@@ -115,18 +109,17 @@ MessagingFee memory fee = IOFT(localOFT).quoteSend(sendParam, false);
 IOFT(localOFT).send{ value: fee.nativeFee }(sendParam, fee, payable(msg.sender));
 ```
 
-Hedera → EVM: approve the **HTS token** for the connector, then `send` with quoted native fee.
+Hedera → EVM: approve the **HTS token** for the connector, then `send` with quoted native fee (apply wei/tinybar scaling if required by the RPC).
 
-## Deploy order (template)
+## Deploy order (generic)
 
 ```text
-1. Deploy MyOFT on Sepolia
-2. Deploy MyHTSConnectorOFT on Hedera (with HTS create value)
-3. Deploy workers (optional educational mocks) on both chains
-4. Wire Sepolia OApp with Hedera peer
-5. Wire Hedera OApp with Sepolia peer
-6. Verify peers(remoteEid) both ways
-7. Associate Hedera account with htsTokenAddress
-8. Send + relay (Labs network or educational lzReceive relay)
-9. Sync frontend bridge config
+1. Deploy OFT on EVM
+2. Deploy HTS connector OFT on Hedera (with HTS create value)
+3. Deploy workers (Labs or educational mocks) on both chains
+4. Wire EVM OApp ↔ Hedera OApp
+5. Verify peers(remoteEid) both ways
+6. Associate Hedera account with htsTokenAddress
+7. Send (+ educational lzReceive relay if using mocks)
+8. Sync frontend bridge config if applicable
 ```

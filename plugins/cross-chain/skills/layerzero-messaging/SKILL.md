@@ -12,9 +12,9 @@ description: >
 **OFT pattern:** deploy paired Omnichain Fungible Tokens — a standard `OFT` on the EVM side and an **HTS connector OFT** on Hedera — then `setPeer` both ways and send with LayerZero V2 fees.
 
 ```text
-MyOFT (Sepolia)  ←setPeer→  MyHTSConnectorOFT (Hedera)
-       │ send / quoteSend          │ _debit burn / _credit mint (HTS 0x167)
-       └──────── Endpoint V2 + ULN + DVN + Executor ────────┘
+OFT (EVM)  ←setPeer→  HTSConnectorOFT (Hedera)
+  │ send / quoteSend          │ _debit burn / _credit mint (HTS 0x167)
+  └──────── Endpoint V2 + ULN + DVN + Executor ────────┘
 ```
 
 This skill focuses on **LayerZero V2 OApp/OFT + Hedera HTS**. Educational templates may use **simple workers** and a manual/UI `lzReceive` relay — not the same as production LayerZero Labs verification.
@@ -27,18 +27,12 @@ This skill focuses on **LayerZero V2 OApp/OFT + Hedera HTS**. Educational templa
 | Peer | `setPeer(remoteEid, bytes32(uint256(uint160(remoteOApp))))` on **both** sides |
 | Send | `quoteSend(SendParam, payInLzToken)` → `send{value: nativeFee}(SendParam, fee, refund)` |
 | Receiver | `to` in `SendParam` is `bytes32` (padded address) |
-| Hedera OFT | `HTSConnector` / `MyHTSConnectorOFT` — create HTS token, burn on send, mint on receive |
-| HTS fee | Deploy connector with native value (template uses ~`40 ether` / 20+ HBAR via JSON-RPC rescale) |
+| Hedera OFT | HTS-backed connector — create HTS token, burn on send, mint on receive |
+| HTS fee | Deploy connector with native value to pay `createFungibleToken` |
 | Approval | User must `approve(connector, amount)` on the **HTS token** before Hedera → EVM `send` |
+| IDs | Use LayerZero **EIDs** in peers/`dstEid` — not EVM chain IDs |
 
-**Testnet EIDs / endpoints** (from template `HelperConfig`; re-check [LayerZero deployments](https://metadata.layerzero-api.com/v1/metadata/deployments)):
-
-| Network | Chain ID | EID | Endpoint V2 |
-| ------- | -------- | --- | ----------- |
-| Hedera testnet | `296` | `40285` | `0xbD672D1562Dd32C23B563C989d8140122483631d` |
-| Ethereum Sepolia | `11155111` | `40161` | `0x6EDCE65403992e310A62460808c4b910D972f10f` |
-
-See [references/hedera-endpoints.md](references/hedera-endpoints.md) for ULN/DVN/executor addresses. See [references/examples.md](references/examples.md) for contract and wire snippets.
+See [references/hedera-endpoints.md](references/hedera-endpoints.md) for where to source Endpoint/ULN/DVN addresses. See [references/examples.md](references/examples.md) for wire and send sketches.
 
 ## Critical: Wire Both Directions
 
@@ -59,11 +53,11 @@ On Hedera, do **not** use a plain ERC-20 OFT as the primary path. Use an HTS-bac
 - `_debit`: transfer HTS in → **burn**
 - `_credit`: **mint** → transfer HTS out
 - Amounts must fit `int64` for HTS mint/burn/transfer
-- Associate the receiver account with the HTS token before Sepolia → Hedera receives
+- Associate the receiver account with the HTS token before EVM → Hedera receives
 
 ```solidity
 // Deploy with value so createFungibleToken fee is paid
-new MyHTSConnectorOFT{ value: htsCreateValue }(name, symbol, lzEndpoint, owner);
+new HTSConnectorOFT{ value: htsCreateValue }(name, symbol, lzEndpoint, owner);
 ```
 
 ## Send Flow
@@ -74,7 +68,7 @@ SendParam memory sendParam = SendParam({
     to: bytes32(uint256(uint160(receiver))),
     amountLD: amountLD,
     minAmountLD: (amountLD * 9) / 10,
-    extraOptions: OptionsBuilder.newOptions().addExecutorLzReceiveOption(80_000, 0),
+    extraOptions: OptionsBuilder.newOptions().addExecutorLzReceiveOption(lzReceiveGas, 0),
     composeMsg: "",
     oftCmd: ""
 });
@@ -83,21 +77,21 @@ MessagingFee memory fee = IOFT(localOFT).quoteSend(sendParam, false);
 IOFT(localOFT).send{ value: fee.nativeFee }(sendParam, fee, payable(refundTo));
 ```
 
-**Hedera → Sepolia note:** forge fee simulation can disagree with Hedera JSON-RPC wei/tinybar scaling — templates often `quote` + `cast send` for that direction.
+**Hedera → EVM note:** forge fee simulation can disagree with Hedera JSON-RPC wei/tinybar scaling — often `quote` via `cast` + scaled native fee for that direction.
 
-## Deploy Checklist (testnet)
+## Deploy Checklist (generic)
 
-1. Deploy Sepolia `MyOFT` (optional premint)
-2. Deploy Hedera `MyHTSConnectorOFT` with HTS create value
+1. Deploy EVM `OFT` (optional premint)
+2. Deploy Hedera HTS connector OFT with HTS create value
 3. Deploy workers (Labs DVN/executor **or** educational simple workers)
-4. Wire Sepolia OApp ↔ Hedera OApp (`WireOApp` both ways)
+4. Wire both OApps (`setPeer` + libraries + config + enforced options)
 5. Associate Hedera account with `htsTokenAddress()`
-6. Sync frontend config; fund relay key if using UI auto-relay
-7. Send small amount; track on [LayerZero Scan testnet](https://testnet.layerzeroscan.com)
+6. Sync frontend config if applicable; fund relay key if using UI auto-relay
+7. Send small amount; track on LayerZero Scan (testnet/mainnet as appropriate)
 
 ## Educational Relay
 
-Some templates use **SimpleDVNMock** / **SimpleExecutorMock** and an explicit `lzReceive` relay step (`make layerzero-relay` or Next.js `LAYERZERO_RELAY_PRIVATE_KEY`). Treat that as a learning aid — production apps rely on LayerZero’s verification network, not a custom relayer key in the app server.
+Some templates use **simple DVN/executor mocks** and an explicit `lzReceive` relay step. Treat that as a learning aid — production apps rely on LayerZero’s verification network, not a custom relayer key in the app server.
 
 ## Checklist
 
@@ -111,8 +105,7 @@ Some templates use **SimpleDVNMock** / **SimpleExecutorMock** and an explicit `l
 
 ## References
 
-- [references/examples.md](references/examples.md) — MyOFT, HTSConnector, wire, send
-- [references/hedera-endpoints.md](references/hedera-endpoints.md) — EIDs, Endpoint V2, ULN, DVN, executor
+- [references/examples.md](references/examples.md) — OFT, HTS connector, wire, send
+- [references/hedera-endpoints.md](references/hedera-endpoints.md) — EIDs vs chain IDs, where to source addresses
 - [LayerZero V2 docs](https://docs.layerzero.network/v2)
 - [LayerZero deployments metadata](https://metadata.layerzero-api.com/v1/metadata/deployments)
-- Source template: [scaffold-hbar `templates/bridge`](https://github.com/hedera-dev/scaffold-hbar/tree/templates/bridge)
