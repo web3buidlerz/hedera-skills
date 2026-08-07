@@ -3,8 +3,8 @@ name: axelar-gmp
 description: >
   Axelar General Message Passing (GMP) on Hedera. Use when sending or receiving cross-chain
   contract calls via Axelar Gateway (callContract, payNativeGasForContractCall), building
-  AxelarExecutable receivers, wiring Hedera↔EVM destinations, or implementing bridge-sender /
-  message-receiver patterns for orchestrated flows (e.g. scheduled DCA to Sepolia).
+  AxelarExecutable receivers, wiring Hedera↔EVM destinations, or separating bridge transport
+  from destination handlers (orchestrated / scheduled flows).
 ---
 
 # Axelar GMP (Hedera)
@@ -17,7 +17,7 @@ Source app → BridgeSender (pay gas + gateway.callContract)
                       → AxelarExecutable._execute → Handler
 ```
 
-On Hedera, orchestration often pairs GMP with **HSS** (`0x16b`) so a contract can self-reschedule and dispatch each cycle. Keep bridge transport behind `IBridgeSender` so the orchestrator stays bridge-agnostic.
+On Hedera, orchestration often pairs GMP with **HSS** (`0x16b`) so a contract can self-reschedule and dispatch each cycle. Keep bridge transport behind a thin sender interface so the orchestrator stays bridge-agnostic.
 
 ## Quick Reference
 
@@ -26,17 +26,10 @@ On Hedera, orchestration often pairs GMP with **HSS** (`0x16b`) so a contract ca
 | `IAxelarGateway` | `callContract(destChain, destAddress, payload)` |
 | `IAxelarGasService` | `payNativeGasForContractCall{value}` before the gateway call |
 | `AxelarExecutable` | Destination base; override `_execute(...)` |
-| Chain names | Axelar string IDs — e.g. source `"hedera"`, dest `"ethereum-sepolia"` |
+| Chain names | Axelar string IDs — e.g. `"hedera"`, `"ethereum-sepolia"` (not numeric chain IDs) |
 | Addresses | EVM string form of the peer contract (checksummed `0x…`) |
 
-**Hedera testnet defaults** (re-check [Axelar docs](https://docs.axelar.dev/) before mainnet):
-
-| Contract | Address |
-| -------- | ------- |
-| Gateway (Hedera + Sepolia often same canonical) | `0xe432150cce91c13a887f7D836923d5597adD8E31` |
-| Gas service (Hedera) | `0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6` |
-
-See [references/hedera-axelar.md](references/hedera-axelar.md) for env vars and wiring. See [references/examples.md](references/examples.md) for full sender / receiver / orchestrator skeletons.
+See [references/hedera-axelar.md](references/hedera-axelar.md) for chain-name conventions and SDK imports. See [references/examples.md](references/examples.md) for sender / receiver sketches.
 
 ## Critical: Gas Then Gateway
 
@@ -45,7 +38,7 @@ Always pay gas **before** `callContract`. Use `msg.value > 0` for relay fees; re
 ```solidity
 gasService.payNativeGasForContractCall{ value: msg.value }(
     address(this),       // sender contract
-    destinationChain,    // e.g. "ethereum-sepolia"
+    destinationChain,    // Axelar name string
     destinationAddress,  // receiver 0x… as string
     payload,
     refundAddress        // usually authorizedCaller / orchestrator
@@ -77,47 +70,44 @@ require(
 ## Architecture: Split Transport From Business Logic
 
 ```text
-Hedera                          Destination (e.g. Sepolia)
+Source chain                    Destination chain
 ─────────────────────────────   ─────────────────────────────
-DcaOrchestrator ──send──►       AxelarMessageReceiver (_execute)
-     │ IBridgeSender                    │ IDcaHandler
-AxelarMessageSender             DcaExecutor (swap / settle)
+Orchestrator ──send──►          MessageReceiver (_execute)
+     │ BridgeSender iface              │ Handler iface
+BridgeSender                    Handler (swap / settle / …)
 ```
 
 1. Deploy **handler** first (no bridge knowledge).
 2. Deploy **receiver** with gateway + expected source + handler.
 3. Deploy **sender** with gateway + gas service + destination chain/address.
-4. Deploy **orchestrator** with sender address; `sender.setAuthorizedCaller(orchestrator)`.
+4. Deploy **orchestrator** with sender address; authorize orchestrator on sender.
 5. **Wire** after both deploys: set destination on sender; set expected source on receiver.
-6. Fund orchestrator (native for Axelar gas) and handler (tokens for destination work).
+6. Fund orchestrator (native for Axelar gas) and handler (tokens/capital for destination work).
 
 ## Payload Contract
 
-Agree a single ABI encode/decode on both sides:
+Agree a single ABI encode/decode on both sides. Keep payloads versionable if you evolve fields — mismatched decode bricks the route.
 
 ```solidity
-bytes memory payload = abi.encode(planId, amountPerExecution, targetToken, minAmountOut);
+bytes memory payload = abi.encode(/* agreed fields… */);
 // receiver:
-(uint256 planId, uint256 amountIn, address tokenOut, uint256 minAmountOut) =
-    abi.decode(payload, (uint256, uint256, address, uint256));
+(/* fields… */) = abi.decode(payload, (/* matching types… */));
 ```
-
-Keep payloads versionable if you evolve fields — mismatched decode bricks the route.
 
 ## Hedera Orchestration Hook (HSS)
 
-When the source app schedules itself via HSS, each `executeDca` (or equivalent) should:
+When the source app schedules itself via HSS (`0x16b`), each cycle should:
 
 1. Enforce interval / plan active
-2. `bridgeSender.send{ value: feeForSender }(...)`
+2. Call the bridge sender with native value for Axelar gas
 3. Reschedule next expiry with `hasScheduleCapacity` + `scheduleCall` (SUCCESS = `22`)
 
-If scheduling fails, mark `needsReschedule` and expose a manual `reschedule` for the plan owner.
+If scheduling fails, mark a recovery flag and expose a manual reschedule for the plan owner.
 
 ## Checklist
 
 - [ ] Gas paid with native value before `callContract`
-- [ ] Destination chain name matches Axelar’s ID (`ethereum-sepolia`, not `11155111`)
+- [ ] Destination chain name matches Axelar’s ID (string, not numeric chain ID)
 - [ ] Peer addresses set after both contracts deploy (wire step)
 - [ ] Source allowlist + authorized callers on both ends
 - [ ] Payload encode/decode identical
@@ -126,8 +116,7 @@ If scheduling fails, mark `needsReschedule` and expose a manual `reschedule` for
 
 ## References
 
-- [references/examples.md](references/examples.md) — sender, receiver, orchestrator, executor
-- [references/hedera-axelar.md](references/hedera-axelar.md) — addresses, chain names, env
+- [references/examples.md](references/examples.md) — sender / receiver / allowlist sketches
+- [references/hedera-axelar.md](references/hedera-axelar.md) — chain names vs IDs, SDK imports
 - [Axelar GMP overview](https://docs.axelar.dev/dev/general-message-passing/overview)
 - [axelar-gmp-sdk-solidity](https://github.com/axelarnetwork/axelar-gmp-sdk-solidity)
-- Source template: [scaffold-hbar `templates/cross-chain-dca`](https://github.com/hedera-dev/scaffold-hbar/tree/templates/cross-chain-dca)

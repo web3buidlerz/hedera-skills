@@ -1,41 +1,24 @@
-# Hedera ↔ Axelar Addresses And Names
+# Hedera ↔ Axelar Conventions
 
-Values from Scaffold-HBAR `templates/cross-chain-dca` (`packages/hardhat/.env.example`). Re-check [Axelar network configs](https://docs.axelar.dev/resources/contract-addresses/testnet) before mainnet.
+Concrete gateway/gas addresses and env var values are **project-specific**. Prefer the consuming repo’s `.env` / `AGENTS.md` (or equivalent). Re-check [Axelar network configs](https://docs.axelar.dev/resources/contract-addresses/testnet) before mainnet.
 
 ## Chain IDs vs Axelar names
 
-| Network | EVM chain ID | Axelar GMP name (typical) |
-| ------- | ------------ | ------------------------- |
+| Network (example) | EVM chain ID | Axelar GMP name (typical) |
+| ----------------- | ------------ | ------------------------- |
 | Hedera testnet | `296` | `hedera` |
 | Ethereum Sepolia | `11155111` | `ethereum-sepolia` |
 
 Pass **Axelar names** to `callContract` / allowlists — not numeric chain IDs.
 
-## Testnet contracts
+## Wiring peers
 
-| Role | Env var | Address |
-| ---- | ------- | ------- |
-| Hedera gateway | `AXELAR_GATEWAY_HEDERA` | `0xe432150cce91c13a887f7D836923d5597adD8E31` |
-| Hedera gas service | `AXELAR_GAS_SERVICE_HEDERA` | `0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6` |
-| Sepolia gateway | `AXELAR_GATEWAY_SEPOLIA` | `0xe432150cce91c13a887f7D836923d5597adD8E31` |
+Destination / source **contract** addresses are set at deploy/wire time:
 
-## Env shape
+- Source sender → `setDestinationAddress(destinationReceiver)` (string `0x…`)
+- Destination receiver → `setExpectedSourceAddress(sourceSender)` (+ matching source chain name)
 
-```bash
-# Hedera side
-AXELAR_GATEWAY_HEDERA=0xe432150cce91c13a887f7D836923d5597adD8E31
-AXELAR_GAS_SERVICE_HEDERA=0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6
-AXELAR_DESTINATION_CHAIN_NAME=ethereum-sepolia
-
-# Sepolia side
-AXELAR_GATEWAY_SEPOLIA=0xe432150cce91c13a887f7D836923d5597adD8E31
-AXELAR_SOURCE_CHAIN_NAME=hedera
-```
-
-Destination / source **contract** addresses are set at deploy/wire time (not fixed in env):
-
-- Hedera sender → `setDestinationAddress(sepoliaReceiver)`
-- Sepolia receiver → `setExpectedSourceAddress(hederaSender)` (and matching source chain name)
+Gas is paid on the **source** chain via `payNativeGasForContractCall` (destination often has no gas-service env).
 
 ## SDK dependency
 
@@ -43,7 +26,7 @@ Destination / source **contract** addresses are set at deploy/wire time (not fix
 @axelar-network/axelar-gmp-sdk-solidity
 ```
 
-Imports used by the template:
+Common imports:
 
 - `contracts/interfaces/IAxelarGateway.sol`
 - `contracts/interfaces/IAxelarGasService.sol`
@@ -51,7 +34,7 @@ Imports used by the template:
 
 ## Operational notes
 
-- Fund the **orchestrator** with native HBAR so each `send{value: feeForSender}` can pay Axelar gas.
-- Fund the **destination handler** with the tokens it spends (e.g. USDC for Uniswap).
+- Fund the **orchestrator** with native gas token so each `send{value: …}` can pay Axelar relay fees.
+- Fund the **destination handler** with whatever capital it spends (tokens, etc.).
 - Track delivery on [Axelarscan](https://axelarscan.io/) / testnet explorers when debugging stuck GMP messages.
-- Demo templates may keep destination proceeds in the executor contract — document ownership before production.
+- Demo apps may keep destination proceeds in the handler contract — document ownership before production.
