@@ -2,9 +2,9 @@
 
 Enable **gates** in order. The skeleton defaults to **gate 0–1 only** so the
 first run stays cheap. Uncomment higher gates only after lower ones are green.
-Gate enablement is identical for `run` and **extend**; only copy targets and
-CLI commands differ (`hedera-harness run specs/<slug>.yaml` vs
-`hedera-harness extend .harness/spec.yaml`). Terms: [GLOSSARY.md](../GLOSSARY.md).
+Gate enablement is identical for **project** and **legacy clone** layouts; only
+copy targets and CLI paths differ (`hedera-harness run .harness/spec.yaml` vs
+`hedera-harness run specs/<slug>.yaml`). Terms: [GLOSSARY.md](../GLOSSARY.md).
 
 Pinned skeleton source (prefer a local harness clone when present):
 
@@ -36,8 +36,8 @@ Pass condition: every enabled **gate** must pass. Semantic **infra** failures
 ## Gate 2 — thin Playwright smoke
 
 Copy `skeletons/new-template/playwright-smoke.yaml` →
-`playwright/<name>-smoke.yaml` (clone / `run`) or
-`.harness/playwright/<slug>-smoke.yaml` (**extend**).
+`playwright/<name>-smoke.yaml` (**legacy clone**) or
+`.harness/playwright/<slug>-smoke.yaml` (**project**).
 
 Rules:
 
@@ -54,7 +54,7 @@ In the **spec file**, uncomment:
 ```yaml
 validators:
   playwright: playwright/<name>-smoke.yaml
-  # extend: playwright: .harness/playwright/<slug>-smoke.yaml
+  # project: playwright: .harness/playwright/<slug>-smoke.yaml
 ```
 
 ## Gate 3 — semantic oracle + validator agent
@@ -65,7 +65,7 @@ validators:
 
 ```yaml
 contract: contracts/<name>-acceptance.json
-# extend: contract: .harness/contracts/<slug>-acceptance.json
+# project: contract: .harness/contracts/<slug>-acceptance.json
 
 validator:
   enabled: true

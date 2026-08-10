@@ -17,9 +17,9 @@ this protocol. Either way, apply the harness decision tree below.
 ### Facts to look up (do not ask)
 
 - Is this a harness clone? (`specs/`, `skeletons/new-template/`, `skills-index.json`)
-- Is this a scaffolded app ready for **extend**? (`.harness/spec.yaml`,
-  `packages/nextjs`, `yarn harness:extend` / `hedera-harness` in package.json)
-- Which mode fits — greenfield **run** vs in-place **extend**?
+- Is this a scaffolded app ready for **project** layout? (`.harness/spec.yaml`,
+  `packages/nextjs`, `yarn harness:run` / `hedera-harness` in package.json)
+- Which layout fits — **project** (preferred) vs **legacy clone**?
 - Which generator skills exist? (read `skills-index.json` from clone or package)
 - What do existing **spec files** under `specs/` or `.harness/` do for conventions?
 - What scripts does the host app / seed document? (README / package.json)
@@ -30,19 +30,21 @@ this protocol. Either way, apply the harness decision tree below.
 
 Walk these decisions in order. Later choices depend on earlier answers.
 
-1. **Mode** — **run** (greenfield seed + isolated workspace) or **extend**
-   (in-place on an already-scaffolded app under `.harness/`).
-   *Recommend:* **extend** when cwd is already a Scaffold HBAR app; **run**
-   when authoring inside a harness clone or building a new template from seed.
+1. **Layout** — **project** (in-place `.harness/` on a scaffolded app / after
+   `hedera-harness init`) or **legacy clone** (greenfield files under a harness
+   clone: `specs/<slug>.yaml`).
+   *Recommend:* **project** whenever cwd is already a Scaffold HBAR app or the
+   user can `init` one; **legacy clone** only when authoring inside a harness
+   clone for historical greenfield templates.
 
-2. **Product goal** — one paragraph: what the demo / extension is, who it is
+2. **Product goal** — one paragraph: what the demo / feature is, who it is
    for, what "done" looks like in a browser without live credentials.
-   *Recommend:* keep the first journey credential-free. For **extend**, phrase
+   *Recommend:* keep the first journey credential-free. For **project**, phrase
    the delta against the existing app (what stays, what is added).
 
 3. **Slug** — kebab-case name for the **spec file** `name` and classic paths.
    *Recommend:* short product noun (`proof-wall`, `x402-pay-to-post`). For
-   **extend**, `templateMetadata.name` may stay as the host template id.
+   **project**, `templateMetadata.name` may stay as the host template id.
 
 4. **Solidity in scope?** — yes / no.
    - Yes → Hardhat/Foundry workspaces allowed; consider `hts-system-contract`
@@ -66,6 +68,6 @@ Walk these decisions in order. Later choices depend on earlier answers.
    Offer 2 / 3 / 3.5 only after the user opts in. Ambition decides which files
    get filled vs left as commented stubs.
 
-9. **Confirm shared understanding** — summarize the decisions (mode, slug,
+9. **Confirm shared understanding** — summarize the decisions (layout, slug,
    services, routes, Solidity, gates, generator skills). Wait for an explicit
    go-ahead before emitting files.

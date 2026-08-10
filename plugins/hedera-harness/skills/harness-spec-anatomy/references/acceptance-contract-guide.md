@@ -2,8 +2,8 @@
 
 The acceptance contract is the **oracle** for gate 3. The semantic validator
 grades the running app against these assertions — not the raw PRD. Keep the
-run **blind**. Path is `contracts/<name>-acceptance.json` (clone / `run`) or
-`.harness/contracts/<slug>-acceptance.json` (**extend**).
+run **blind**. Path is `contracts/<name>-acceptance.json` (**legacy clone**) or
+`.harness/contracts/<slug>-acceptance.json` (**project**).
 Terms: [GLOSSARY.md](../GLOSSARY.md).
 
 Source of truth in the harness repo:

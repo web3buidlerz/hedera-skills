@@ -344,6 +344,6 @@ pointer. Content rules are identical; only the path differs.
 ## Gate 2 / 3 / 3.5 bodies
 
 Do not embed here — they drift. Copy from the harness skeletons or follow
-[tier-strategy.md](tier-strategy.md). For **extend**, place copies under
+[tier-strategy.md](tier-strategy.md). For **project**, place copies under
 `.harness/playwright/` and `.harness/contracts/` and point the **spec file**
 paths there.

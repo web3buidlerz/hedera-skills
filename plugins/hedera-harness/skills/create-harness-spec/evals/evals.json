@@ -19,16 +19,16 @@
     },
     {
       "id": 3,
-      "prompt": "I already scaffolded a Scaffold HBAR hedera-demo app (packages/nextjs present). Help me create an in-place extend harness spec under .harness/ for adding a public Learn page. No Solidity. Gate 0-1 only.",
-      "expected_output": "A grilling session that picks extend mode, waits for shared understanding, then emits .harness/prd.md, .harness/spec.yaml (no seed, with extend.baseline), .harness/validators/static.json, .harness/validators/yarn.json, and hands off yarn harness:extend or hedera-harness extend.",
+      "prompt": "I already scaffolded a Scaffold HBAR hedera-demo app (packages/nextjs present). Help me create an in-place project harness spec under .harness/ for adding a public Learn page. No Solidity. Gate 0-1 only.",
+      "expected_output": "A grilling session that picks project layout, waits for shared understanding, then emits .harness/prd.md, .harness/spec.yaml (no seed, with extend.baseline), .harness/validators/static.json, .harness/validators/yarn.json, and hands off yarn harness:run or hedera-harness run.",
       "files": [],
       "assertions": [
-        "The output satisfies: Chooses extend / .harness layout",
+        "The output satisfies: Chooses project / .harness layout",
         "The output satisfies: Does not write files until shared understanding is confirmed",
         "The output satisfies: Emits files under .harness/",
         "The output includes extend.baseline: Mentions or includes extend.baseline",
-        "The output satisfies: Notes that extend has no seed",
-        "The output satisfies: Hands off to extend CLI / yarn script"
+        "The output satisfies: Notes that project layout has no seed",
+        "The output satisfies: Hands off to run CLI / yarn script"
       ]
     },
     {
