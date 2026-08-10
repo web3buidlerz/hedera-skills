@@ -2,7 +2,7 @@
 
 Compact Tier 0–1 bodies for reconstructing a **spec** without a harness clone.
 Prefer copying `skeletons/new-template/` when available (clone / `run`). After
-writing, replace every `my-template` with the **slug**. For **extend**, emit
+writing, replace every `my-template` with the **slug**. For **project**, emit
 under `.harness/` (see below). Terms: [GLOSSARY.md](../GLOSSARY.md).
 
 ## File table — clone / `run`
@@ -16,14 +16,14 @@ under `.harness/` (see below). Terms: [GLOSSARY.md](../GLOSSARY.md).
 | `playwright/<name>-smoke.yaml` | Gate 2 | Playwright **gate** |
 | `contracts/<name>-acceptance.json` | Gate 3 | Semantic validator (**oracle**) |
 
-## File table — extend
+## File table — project (preferred)
 
 Paths relative to the scaffolded project root (parent of `.harness/`).
 
 | File | Required? | Consumed by |
 |------|-----------|-------------|
 | `.harness/prd.md` | Yes | Generator |
-| `.harness/spec.yaml` (**spec file**) | Yes | Harness CLI (`extend`) |
+| `.harness/spec.yaml` (**spec file**) | Yes | Harness CLI (`run`) |
 | `.harness/validators/static.json` | Yes | Gate 0–1 |
 | `.harness/validators/yarn.json` | Yes | Gate 0–1 |
 | `.harness/playwright/<slug>-smoke.yaml` | Gate 2 | Playwright **gate** |
@@ -232,7 +232,7 @@ implementation detail that will churn.
 The command with `"name": "install"` is load-bearing: the harness fingerprints
 it across repair attempts. Renaming it silently disables the skip.
 
-## Compact Tier 0–1 body — extend (`.harness/spec.yaml`)
+## Compact Tier 0–1 body — project (`.harness/spec.yaml`)
 
 No `seed`. Paths relative to the project root. `templateMetadata.name` keeps
 the host template identity; `name` is the extension **slug**.
@@ -244,7 +244,7 @@ description: REPLACE_ME — in-place extension of an already-scaffolded app.
 prd: .harness/prd.md
 # contract: .harness/contracts/my-extension-acceptance.json
 
-# No seed — extend runs against the already-scaffolded cwd.
+# No seed — project-centric run against the already-scaffolded cwd.
 
 generator:
   provider: command
@@ -328,16 +328,16 @@ logging:
   notes: .harness/runs/harness-notes.md
 ```
 
-Key extend-only loader fields: `extend`, `extend.baseline`. Omit `seed`.
+Key project-layout loader fields: `extend`, `extend.baseline`. Omit `seed`.
 Static validators should assert app health / extension deliverables — not
 `template.json` name (create-scaffold-hbar removes `template.json`).
 
-Handoff: `yarn harness:extend` or `hedera-harness extend .harness/spec.yaml`.
+Handoff: `yarn harness:run` or `hedera-harness run .harness/spec.yaml`.
 
 ## PRD stub
 
 See [prd-and-journeys.md](prd-and-journeys.md). Write
-`docs/prds/my-template.md` (clone / `run`) or `.harness/prd.md` (**extend**)
+`docs/prds/my-template.md` (clone / `run`) or `.harness/prd.md` (**project**)
 with Goal / Journeys / Hedera services / Non-goals / Deliverables / Acceptance
 pointer. Content rules are identical; only the path differs.
 

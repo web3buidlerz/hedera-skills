@@ -5,25 +5,33 @@ Use these terms exactly. Do not substitute "pack", "benchmark pack", or
 
 **Spec** — the coupled set of files the harness consumes for one benchmark
 (PRD, **spec file**, static validator, command validator, and optionally
-Playwright smoke + **oracle**). Layout is either clone/`run` or **extend**.
+Playwright smoke + **oracle**). Layout is either **project** (preferred) or
+**legacy clone**.
 _Avoid_: pack, benchmark pack.
 
-**Spec file** — the YAML the CLI loads: seed/generator/validators/gates (and
-for **extend**, `extend.baseline`). Path is `specs/<name>.yaml` (clone / `run`)
-or `.harness/spec.yaml` (**extend**). One file inside the **spec**.
+**Spec file** — the YAML the CLI loads: generator/validators/gates (and for
+**project**, `extend.baseline`). Path is `.harness/spec.yaml` (**project**) or
+`specs/<name>.yaml` (**legacy clone**). One file inside the **spec**.
 
-**Slug** — the kebab-case name (`proof-wall`, `hedera-demo-extend`) for the
-**spec file** `name` field and classic path map. In **extend** layout,
-`templateMetadata.name` may keep the host template identity and differ from
-the extension **slug**.
+**Slug** — the kebab-case name (`proof-wall`, `hcs-message-wall`) for the
+**spec file** `name` field. In **project** layout, `templateMetadata.name` may
+keep the host template identity and differ from the feature **slug**.
 
-**Run** — greenfield CLI mode (`hedera-harness run`). Seeds an isolated
-workspace from `scaffold-hbar`, then generate → validate → repair. Artifacts
-under `runs/`.
+**Run** — the project-centric CLI command (`hedera-harness run`). Operates on
+the project cwd (after `hedera-harness init` or an existing scaffolded app),
+creates/continues `harness/run-*` branches, then generate → validate → repair.
+Artifacts under `.harness/runs/`. Requires `extend.baseline` in project layout.
 
-**Extend** — in-place CLI mode (`hedera-harness extend`). No seed; the
-scaffolded project cwd is the workspace. Spec lives under `.harness/`.
-Artifacts under `.harness/runs/`. Requires `extend.baseline`.
+**Init** — bootstrap command (`hedera-harness init`) that seeds scaffold-hbar
+into a directory, creates a **fresh git repo** (no scaffold history/remote),
+and provisions `.harness/`.
+
+**Project layout** — preferred in-place recipe under `.harness/` in a
+scaffolded app. No seed. Spec lives under `.harness/`.
+
+**Legacy clone** — historical greenfield layout under a harness clone
+(`specs/<slug>.yaml`, `docs/prds/`, `validators/`). Prefer **project** for new
+work.
 
 **Blind** — the generation-integrity property. The PRD is vendored to the
 generator; the **oracle** grades the running app. Pasting assertion ids,

@@ -18,9 +18,29 @@ agent). Name skills like `hedera-consensus-service`, `hts-system-contract`,
 
 A **spec** is the same six coupled concepts in either layout. Paths differ.
 
-### Clone / `run` (greenfield)
+### Project / `run` (preferred)
 
-Harness clone root. Seeds a fresh workspace from `scaffold-hbar`.
+Scaffolded app root (from `hedera-harness init` or Scaffold HBAR). **No seed** —
+the workspace is the project itself. Paths in the **spec file** are relative to
+that project root.
+
+| File | Required? | Consumed by |
+|------|-----------|-------------|
+| `.harness/prd.md` | Yes | Generator |
+| `.harness/spec.yaml` (**spec file**) | Yes | Harness CLI (`run` / `validate` / `validate-semantic`) |
+| `.harness/validators/static.json` | Yes | Gate 0–1 static validator |
+| `.harness/validators/yarn.json` | Yes | Gate 0–1 command validator |
+| `.harness/playwright/<slug>-smoke.yaml` | Gate 2 | Playwright gate |
+| `.harness/contracts/<slug>-acceptance.json` | Gate 3 | Semantic validator (**oracle**) |
+
+Also required in the **spec file**: `extend.baseline` (YAML key name kept for
+compatibility — host health checks before generation). Artifacts:
+`.harness/runs/`. Handoff: `yarn harness:run` or
+`hedera-harness run .harness/spec.yaml`.
+
+### Legacy clone (historical greenfield)
+
+Harness clone root. Older isolated layout that seeds a fresh workspace.
 
 | File | Required? | Consumed by |
 |------|-----------|-------------|
@@ -31,32 +51,14 @@ Harness clone root. Seeds a fresh workspace from `scaffold-hbar`.
 | `playwright/<name>-smoke.yaml` | Gate 2 | Playwright gate |
 | `contracts/<name>-acceptance.json` | Gate 3 | Semantic validator (**oracle**) |
 
-Artifacts: `runs/`. Handoff: `hedera-harness run specs/<slug>.yaml`.
-
-### Extend / in-place (scaffolded project)
-
-Already-scaffolded app root (parent of `.harness/`). **No seed** — the
-workspace is the project itself. Paths in the **spec file** are relative to
-that project root.
-
-| File | Required? | Consumed by |
-|------|-----------|-------------|
-| `.harness/prd.md` | Yes | Generator |
-| `.harness/spec.yaml` (**spec file**) | Yes | Harness CLI (`extend` / `validate` / `validate-semantic`) |
-| `.harness/validators/static.json` | Yes | Gate 0–1 static validator |
-| `.harness/validators/yarn.json` | Yes | Gate 0–1 command validator |
-| `.harness/playwright/<slug>-smoke.yaml` | Gate 2 | Playwright gate |
-| `.harness/contracts/<slug>-acceptance.json` | Gate 3 | Semantic validator (**oracle**) |
-
-Also required in the **spec file**: `extend.baseline` (commands that prove the
-host app is healthy before the extension). Artifacts: `.harness/runs/`.
-Handoff: `yarn harness:extend` or `hedera-harness extend .harness/spec.yaml`.
+Artifacts: `runs/`. Handoff: `hedera-harness run specs/<slug>.yaml`. Prefer
+**project** layout for new work.
 
 Compact Tier 0–1 bodies and reconstruction notes: [references/spec-files.md](references/spec-files.md).
 
 ## Slug map
 
-These must all agree on the same **slug** (`<name>`) in **clone / `run`**
+These must all agree on the same **slug** (`<name>`) in **legacy clone**
 layout:
 
 | Location | Field |
@@ -69,12 +71,12 @@ layout:
 | Oracle (if present) | `name`, `template`, `prd` |
 | Playwright (if present) | `name` (e.g. `<name>-smoke`) |
 
-**Extend layout differences:**
+**Project layout differences:**
 
-- Spec file `name` is the extension slug (e.g. `hedera-demo-extend`)
-- `templateMetadata.name` is the **existing** template identity (e.g. `hedera-demo`) — it may differ from the extension slug
+- Spec file `name` is the feature slug (e.g. `hcs-message-wall`)
+- `templateMetadata.name` is the **host** template identity (e.g. `scaffold-hbar`) — it may differ from the feature slug
 - PRD / validator filenames often omit the slug (`.harness/prd.md`, `.harness/validators/static.json`)
-- Static validators usually assert app scripts / package fields, not `template.json` name (create-scaffold-hbar removes `template.json`)
+- Static validators usually assert app scripts / package fields, not `template.json` name
 
 Also keep in sync (both layouts):
 
@@ -85,7 +87,7 @@ Also keep in sync (both layouts):
 ## Gates
 
 Enable in order. Skeleton default is **gate 0–1 only**. Gate enablement is
-identical for `run` and `extend`; only copy targets and CLI commands differ.
+identical for project and legacy-clone layouts; only paths and CLI commands differ.
 
 | Gate | Spec file fields | What it checks |
 |------|------------------|----------------|
@@ -116,11 +118,11 @@ change set:
 ## Mechanical check
 
 ```bash
-# Clone / run layout:
-bash skills/harness-spec-anatomy/scripts/check-spec.sh <harness-root> <slug>
-
-# Extend layout (project root that contains .harness/):
+# Project layout (preferred — project root that contains .harness/):
 bash skills/harness-spec-anatomy/scripts/check-spec.sh <project-root> <slug>
+
+# Legacy clone layout:
+bash skills/harness-spec-anatomy/scripts/check-spec.sh <harness-root> <slug>
 ```
 
 Resolve the script path relative to the installed skill. Exit zero means wiring

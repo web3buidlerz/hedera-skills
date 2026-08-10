@@ -17,64 +17,58 @@ generator skills — name domain skills like `hedera-consensus-service`. Keep th
 run **blind**: the PRD carries journeys and outcomes; the **oracle** lives in
 the acceptance contract.
 
-## Step 1: Locate the target and choose mode
+## Step 1: Locate the target
 
-Detect which layout to emit:
+**Default / preferred layout is project-centric** (`.harness/` in a scaffolded app):
 
-| Signal | Mode |
-|--------|------|
-| Cwd is a hedera-harness clone (`specs/`, `skeletons/new-template/`, `skills-index.json`) | **run** (greenfield) |
-| Cwd is a scaffolded app with (or ready for) `.harness/` — e.g. Scaffold HBAR project, `packages/nextjs`, existing `.harness/spec.yaml` | **extend** (in-place) |
-| Neither | Ask where to write and which mode |
+| Signal | Layout |
+|--------|--------|
+| Cwd is a scaffolded app (Scaffold HBAR / `hedera-harness init` project) with or ready for `.harness/` | **project** (primary) |
+| Cwd is a hedera-harness clone (`specs/`, `skeletons/new-template/`) | **legacy clone** (historical greenfield only) |
+| Neither | Ask where to write; prefer **project** |
 
-**run:**
+**project (primary):**
 
-- Prefer copying skeletons from disk (always current).
+- Bootstrap with `hedera-harness init <dir>` if the app does not exist yet.
+- Emit under `.harness/` at the project root (see anatomy project file table).
+- Omit `seed`. Include `extend.baseline` with an `"install"`-named command
+  (YAML key name is historical; used by `hedera-harness run`).
+- Paths in the **spec file** are relative to the project root.
+
+**legacy clone (optional):**
+
+- Prefer copying `skeletons/new-template/*` from a harness clone.
 - Without a clone: reconstruct gate 0–1 from
-  `harness-spec-anatomy` → `references/spec-files.md`. For gates 2 / 3 / 3.5,
-  fetch harness skeletons at the pinned ref in
-  `harness-spec-anatomy` → `references/tier-strategy.md`.
-
-**extend:**
-
-- Emit under `.harness/` at the project root (see anatomy extend file table).
-- Omit `seed`. Include `extend.baseline` with an `"install"`-named command.
-- Set `templateMetadata.name` to the **host** template identity (often from
-  existing app / package scripts), which may differ from the extension **slug**.
+  `harness-spec-anatomy` → `references/spec-files.md`.
 
 ## Step 2: Grill
 
 Follow [references/grilling.md](references/grilling.md). Prefer `/grilling` if
 available; otherwise use the inline protocol there.
 
-Decide **mode** (`run` vs **extend**) before slug / gates. Do **not** write
-files until the user confirms shared understanding.
+Confirm **project** layout (or legacy clone) before slug / gates. Do **not**
+write files until the user confirms shared understanding.
 
 ## Step 3: Emit the spec
 
-### run (clone layout)
+### project (`.harness/` layout) — preferred
 
-1. Pick the **slug**. Copy `skeletons/new-template/*` into the harness layout
-   and rename `my-template` → slug (see the skeleton README for the `cp`/`sed`
-   one-liner). Without a clone, reconstruct from
-   `harness-spec-anatomy` → `references/spec-files.md`.
-2. Fill gate 0–1: PRD, **spec file**, static validator, yarn validator. Keep
-   gates 2 / 3 / 3.5 commented unless the user asked for them.
-3. Set `skills:` to generator skill names from `skills-index.json` that match
-   the Hedera services chosen in the grill.
-4. Optionally deepen (gates 2 / 3 / 3.5) per
-   `harness-spec-anatomy` → `references/tier-strategy.md`.
-
-### extend (`.harness/` layout)
-
-1. Pick the extension **slug**. Write `.harness/prd.md`, `.harness/spec.yaml`,
+1. Pick the feature **slug**. Write `.harness/prd.md`, `.harness/spec.yaml`,
    `.harness/validators/static.json`, `.harness/validators/yarn.json` using the
-   extend compact body in `references/spec-files.md`.
+   project compact body in `references/spec-files.md`.
 2. No `seed`. Include `extend.baseline` (install / lint / build against the
    host app). Point validators at `.harness/...` paths.
-3. Set `skills:` from a local or remote `skills-index.json` (harness package /
-   clone) that match the services chosen in the grill.
+3. Set `skills:` from a local or remote `skills-index.json` (harness package)
+   that match the services chosen in the grill.
 4. Optionally deepen into `.harness/playwright/` and `.harness/contracts/`.
+
+### legacy clone (`specs/<slug>.yaml`)
+
+1. Pick the **slug**. Copy `skeletons/new-template/*` and rename `my-template`
+   → slug. Without a clone, reconstruct from
+   `harness-spec-anatomy` → `references/spec-files.md`.
+2. Fill gate 0–1; keep gates 2 / 3 / 3.5 commented unless requested.
+3. Set `skills:` from `skills-index.json`.
 
 ## Step 4: Completion criterion
 
@@ -84,8 +78,8 @@ Run the anatomy script (resolve path relative to the installed skill):
 bash <path-to>/harness-spec-anatomy/scripts/check-spec.sh <root> <slug>
 ```
 
-Use the harness clone root for **run**, or the scaffolded project root for
-**extend**.
+Use the scaffolded project root for **project**, or the harness clone root for
+**legacy clone**.
 
 **Done when `check-spec.sh` exits clean.** If the script is missing, fall back
 to the slug map and **blind** rules in `harness-spec-anatomy` by hand.
@@ -95,12 +89,12 @@ Then hand off:
 ```bash
 # Prefer /review-harness-spec next, then:
 
-# run (clone):
-npm run harness -- run specs/<slug>.yaml --max-attempts 3
+# project (preferred):
+hedera-harness run .harness/spec.yaml --max-attempts 3
+# or: yarn harness:run
 
-# extend (scaffolded project):
-yarn harness:extend
-# or: hedera-harness extend .harness/spec.yaml --max-attempts 3
+# legacy clone only:
+hedera-harness run specs/<slug>.yaml --max-attempts 3
 ```
 
 Point at the harness README for install, `agent` auth, and gate host

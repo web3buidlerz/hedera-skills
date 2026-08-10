@@ -5,7 +5,7 @@
 # are possible on unusually formatted files; treat findings as leads, not law.
 #
 # Usage: bash check-spec.sh <root> <slug>
-#   Clone / run:  <root> = harness clone; expects specs/<slug>.yaml
+#   Legacy clone:  <root> = harness clone; expects specs/<slug>.yaml
 #   Extend:       <root> = project root; expects .harness/spec.yaml with name: <slug>
 # Exit 0 = clean. Non-zero = one finding printed per line on stderr/stdout.
 
@@ -42,7 +42,7 @@ if [[ -f "$ROOT/specs/${SLUG}.yaml" ]]; then
   LAYOUT="run"
   SPEC_FILE="$ROOT/specs/${SLUG}.yaml"
 elif [[ -f "$ROOT/.harness/spec.yaml" ]]; then
-  LAYOUT="extend"
+  LAYOUT="project"
   SPEC_FILE="$ROOT/.harness/spec.yaml"
 else
   fail "spec file missing: expected $ROOT/specs/${SLUG}.yaml or $ROOT/.harness/spec.yaml"
@@ -167,13 +167,13 @@ else
   fail "could not resolve validators.commands path from spec file"
 fi
 
-# --- extend.baseline (extend layout only) ------------------------------------
+# --- extend.baseline (project layout) ------------------------------------
 
-if [[ "$LAYOUT" == "extend" ]]; then
+if [[ "$LAYOUT" == "project" ]]; then
   if ! has_active "$SPEC_FILE" '^[[:space:]]*extend:'; then
-    fail "extend layout requires an extend: block"
+    fail "project layout requires an extend: block"
   elif ! grep -A20 -E '^[[:space:]]*extend:' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | grep -E '^[[:space:]]*baseline:' >/dev/null; then
-    fail "extend layout requires extend.baseline"
+    fail "project layout requires extend.baseline"
   elif ! grep -A40 -E '^[[:space:]]*baseline:' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | grep -E '^[[:space:]]*-?[[:space:]]*name:[[:space:]]*install[[:space:]]*$' >/dev/null; then
     fail "extend.baseline missing a command literally named \"install\""
   fi
