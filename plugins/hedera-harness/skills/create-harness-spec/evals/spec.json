@@ -3,8 +3,8 @@
   "evals": [
     {
       "id": 0,
-      "prompt": "I have a hedera-harness clone open. Help me create a Tier 0-1 harness spec for an HCS proof-wall demo called proof-wall: users browse a public message wall without a wallet, and posting requires connecting a wallet. No Solidity. Default seed.",
-      "expected_output": "A grilling session that asks one question at a time with a recommended answer, looks up harness facts, waits for shared understanding before writing files, then emits a coherent gate 0-1 spec under docs/prds/proof-wall.md, specs/proof-wall.yaml, validators/proof-wall-static.json, validators/proof-wall-yarn.json.",
+      "prompt": "I already scaffolded a Scaffold HBAR app (packages/nextjs present, yarn workspaces). Help me create a Tier 0-1 hedera-harness recipe under .harness/ for an HCS proof-wall feature called proof-wall: users browse a public message wall without a wallet, and posting requires connecting a wallet. No Solidity.",
+      "expected_output": "A grilling session that asks one question at a time with a recommended answer, looks up project facts instead of asking, waits for shared understanding before writing files, then emits a minimal schemaVersion 2 recipe at .harness/spec.yaml with a baseline install command, plus .harness/prd.md and validators, leaving v2 defaults commented out.",
       "files": [],
       "checks": [
         {
@@ -20,22 +20,34 @@
           "description": "Does not write files until shared understanding is confirmed"
         },
         {
-          "name": "writes-spec-file",
+          "name": "sets-schema-version",
           "type": "contains",
-          "value": "validators.static",
-          "description": "Spec file includes validators.static (harness loader field)"
+          "value": "schemaVersion: 2",
+          "description": "Recipe declares schemaVersion 2"
         },
         {
-          "name": "includes-template-metadata",
+          "name": "emits-harness-dir-paths",
           "type": "contains",
-          "value": "templateMetadata",
-          "description": "Spec file includes templateMetadata (harness loader field)"
+          "value": ".harness/spec.yaml",
+          "description": "Writes the recipe to the project-centric .harness/ path"
         },
         {
-          "name": "names-install-command",
+          "name": "requires-baseline-install",
           "type": "regex",
-          "value": "\"name\"\\s*:\\s*\"install\"",
-          "description": "Command validator has a command literally named install"
+          "value": "baseline[\\s\\S]{0,200}name:\\s*install",
+          "description": "Baseline includes a command literally named install"
+        },
+        {
+          "name": "keeps-recipe-minimal",
+          "type": "regex",
+          "value": "(default|commented|omit|leave.*out|already the default)",
+          "description": "Leaves v2-defaulted plumbing out of the recipe rather than restating it"
+        },
+        {
+          "name": "no-removed-v1-keys",
+          "type": "regex",
+          "value": "^(?!.*\\b(seed:|generator:|logging:|extend:))",
+          "description": "Does not emit keys removed in schema v2 (seed, generator, logging, extend)"
         },
         {
           "name": "recommends-hcs-skill",
@@ -54,120 +66,176 @@
           "type": "regex",
           "value": "(generator|skills:|authoring)",
           "description": "States that authoring skills stay out of the generator skills list"
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "prompt": "I already scaffolded a Scaffold HBAR hedera-demo app (packages/nextjs present). Help me create an in-place project harness spec under .harness/ for adding a public Learn page. No Solidity. Gate 0-1 only.",
-      "expected_output": "A grilling session that picks project layout, waits for shared understanding, then emits .harness/prd.md, .harness/spec.yaml (no seed, with extend.baseline), .harness/validators/static.json, .harness/validators/yarn.json, and hands off yarn harness:run or hedera-harness run.",
-      "files": [],
-      "checks": [
-        {
-          "name": "chooses-project-layout",
-          "type": "regex",
-          "value": "(project|\\.harness/|in-place)",
-          "description": "Chooses project / .harness layout"
         },
         {
-          "name": "waits-for-shared-understanding",
+          "name": "completion-criterion",
           "type": "regex",
-          "value": "(shared understanding|confirm|go-ahead|before (writing|emitting|creating))",
-          "description": "Does not write files until shared understanding is confirmed"
-        },
-        {
-          "name": "emits-harness-dir-paths",
-          "type": "regex",
-          "value": "\\.harness/(spec\\.yaml|prd\\.md|validators/)",
-          "description": "Emits files under .harness/"
-        },
-        {
-          "name": "includes-extend-baseline",
-          "type": "contains",
-          "value": "extend.baseline",
-          "description": "Mentions or includes extend.baseline"
-        },
-        {
-          "name": "omits-seed-or-notes-no-seed",
-          "type": "regex",
-          "value": "(no seed|omit.*seed|without seed|No seed)",
-          "description": "Notes that project layout has no seed"
-        },
-        {
-          "name": "hands-off-run-cli",
-          "type": "regex",
-          "value": "(harness:run|hedera-harness run)",
-          "description": "Hands off to run CLI / yarn script"
+          "value": "(check-spec\\.sh|doctor --recipe-only|hedera-harness doctor)",
+          "description": "Names doctor and/or check-spec.sh as the completion criterion"
         }
       ]
     },
     {
       "id": 1,
-      "prompt": "Deepen my existing proof-wall harness spec to gate 3. Derive acceptance contract assertions from the PRD journeys (browse without wallet; wallet-gated post). Keep the run blind.",
-      "expected_output": "An oracle with C1/C2/... assertions, evaluationRules fail-closed posture, and instructions to uncomment contract + validator in the spec file — without mirroring assertion text into the PRD.",
+      "prompt": "Deepen my existing proof-wall harness recipe to Tier 3. Derive acceptance contract assertions from the PRD journeys (browse without wallet; wallet-gated post).",
+      "expected_output": "An acceptance contract at .harness/acceptance-contract.json with numbered assertions carrying statement and howToVerify, a fail-closed evaluationRules posture, both contract and validator.enabled set in the recipe, and a reminder that the PRD must stay blind.",
       "files": [],
       "checks": [
         {
           "name": "uses-assertion-ids",
-          "type": "contains",
-          "value": "\"id\": \"C1\"",
-          "description": "Oracle uses numbered assertion ids starting at C1"
+          "type": "regex",
+          "value": "\"?C1\"?",
+          "description": "Uses stable numbered assertion ids (C1, C2, ...)"
         },
         {
           "name": "includes-howto-verify",
           "type": "contains",
           "value": "howToVerify",
-          "description": "Assertions include howToVerify"
+          "description": "Assertions carry concrete browser verification steps"
         },
         {
-          "name": "includes-executable-flag-field-awareness",
+          "name": "pairs-contract-and-validator",
+          "type": "regex",
+          "value": "validator[\\s\\S]{0,80}enabled:\\s*true",
+          "description": "Enables both contract and validator.enabled — either alone is misconfigured"
+        },
+        {
+          "name": "default-contract-path",
           "type": "contains",
-          "value": "executableWithTestSigner",
-          "description": "Mentions or uses executableWithTestSigner (loader/grader field)"
+          "value": ".harness/acceptance-contract.json",
+          "description": "Uses the v2 default acceptance contract path"
         },
         {
           "name": "fail-closed-rules",
-          "type": "contains",
-          "value": "failOnUncertainty",
-          "description": "evaluationRules include failOnUncertainty"
+          "type": "regex",
+          "value": "(failOnUncertainty|adversarial|absence of evidence)",
+          "description": "Acceptance contract keeps a fail-closed posture"
         },
         {
           "name": "blind-integrity-reminder",
           "type": "regex",
-          "value": "(blind|oracle|not.*PRD|PRD.*product-facing|journeys and outcomes)",
-          "description": "Reminds that oracle text must not go into the PRD"
+          "value": "(blind|do not (paste|copy).*(PRD|assertion)|keep.*PRD.*product)",
+          "description": "Reminds the user not to leak oracle detail into the PRD"
+        },
+        {
+          "name": "no-hand-written-agent-flags",
+          "type": "regex",
+          "value": "^(?!.*(--sandbox|composer-2\\.5|stream-partial-output|approve-mcps))",
+          "description": "Does not hand-write validator CLI flags or model names; the agent preset owns those"
         }
       ]
     },
     {
       "id": 2,
-      "prompt": "When should I enable chainValidation for my harness spec, and what YAML fields do I need?",
-      "expected_output": "Guidance that gate 3.5 is opt-in, requires gate 3, network testnet, operator env vars, and executableWithTestSigner assertions.",
+      "prompt": "When should I enable chainValidation for my harness recipe, and what YAML fields do I need?",
+      "expected_output": "Explains that Tier 3.5 is opt-in and requires Tier 3, that network must be testnet, that an ECDSA operator is supplied through environment variables, and that assertions must be flagged executableWithTestSigner to actually transact.",
       "files": [],
       "checks": [
         {
           "name": "mentions-chain-validation",
           "type": "contains",
           "value": "chainValidation",
-          "description": "References chainValidation block"
+          "description": "Names the chainValidation block"
         },
         {
           "name": "requires-testnet",
-          "type": "contains",
-          "value": "network: testnet",
-          "description": "Specifies chainValidation.network testnet"
+          "type": "regex",
+          "value": "(testnet|mainnet is (rejected|not allowed))",
+          "description": "States the network must be testnet"
         },
         {
           "name": "mentions-operator-env",
           "type": "regex",
-          "value": "HEDERA_OPERATOR_(ID|KEY)",
-          "description": "Mentions operator env var names"
+          "value": "(HEDERA_OPERATOR_ID|HEDERA_OPERATOR_KEY|accountIdEnv|privateKeyEnv)",
+          "description": "Operator credentials come from environment variables"
+        },
+        {
+          "name": "requires-ecdsa",
+          "type": "regex",
+          "value": "(ECDSA|ED25519)",
+          "description": "Calls out that the operator must be ECDSA, not ED25519"
         },
         {
           "name": "ties-to-executable-flag",
           "type": "contains",
           "value": "executableWithTestSigner",
-          "description": "Ties on-chain grading to executableWithTestSigner"
+          "description": "Links chainValidation to executableWithTestSigner assertions"
+        },
+        {
+          "name": "requires-tier-3",
+          "type": "regex",
+          "value": "(requires (Tier|tier) 3|contract|acceptance contract)",
+          "description": "States that Tier 3.5 depends on Tier 3"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "My .harness/spec.yaml has an extend.baseline block and no schemaVersion. I want to add a new page to the recipe — can you edit it for me?",
+      "expected_output": "Recognizes a v1 recipe, declines to hand-edit it into v2, and recommends running hedera-harness migrate first, then authoring against the migrated v2 result.",
+      "files": [],
+      "checks": [
+        {
+          "name": "detects-v1",
+          "type": "regex",
+          "value": "(v1|schemaVersion|version 1|older schema)",
+          "description": "Identifies the recipe as predating schema v2"
+        },
+        {
+          "name": "recommends-migrate",
+          "type": "contains",
+          "value": "hedera-harness migrate",
+          "description": "Recommends the migrate command"
+        },
+        {
+          "name": "does-not-hand-edit",
+          "type": "regex",
+          "value": "(do not hand-edit|rather than hand|instead of manually|migrate .*(first|before))",
+          "description": "Declines to hand-convert v1 to v2"
+        },
+        {
+          "name": "names-baseline-rename",
+          "type": "regex",
+          "value": "(extend\\.baseline|baseline)",
+          "description": "Explains that extend.baseline becomes baseline"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I want the harness to build a whole HTS subscription feature: the token service layer, a management UI, and wallet-gated mint flows. Should that be one PRD or several?",
+      "expected_output": "Weighs a single PRD against ordered increments, recommends splitting only because this spans layers, explains that prd accepts a list delivered in order onto one branch, and that each increment must leave the app green because baseline and Tier 0-1 run per increment and the first failure stops the sequence.",
+      "files": [],
+      "checks": [
+        {
+          "name": "explains-increments",
+          "type": "regex",
+          "value": "(increment|ordered list|prd:\\s*$|list of PRDs)",
+          "description": "Explains that prd can be an ordered list of increments"
+        },
+        {
+          "name": "each-increment-green",
+          "type": "regex",
+          "value": "(green|passes on its own|own attempt budget|validated per increment)",
+          "description": "Each increment must leave the app green on its own"
+        },
+        {
+          "name": "stops-on-failure",
+          "type": "regex",
+          "value": "(stops|halts|first fail|subsequent increments)",
+          "description": "A failing increment stops the sequence"
+        },
+        {
+          "name": "orders-by-dependency",
+          "type": "regex",
+          "value": "(depend|foundation|layer|order)",
+          "description": "Orders increments by dependency, not size"
+        },
+        {
+          "name": "single-branch",
+          "type": "regex",
+          "value": "(one branch|single branch|same branch)",
+          "description": "Increments deliver onto a single branch"
         }
       ]
     }

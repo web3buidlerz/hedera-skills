@@ -1,61 +1,50 @@
 #!/usr/bin/env bash
-# check-spec.sh — mechanical wiring checks for a hedera-harness spec.
+# check-spec.sh — coherence checks for a hedera-harness recipe (schemaVersion 2).
 #
-# Line-oriented only (grep/rg). No YAML/JSON parser. False positives/negatives
-# are possible on unusually formatted files; treat findings as leads, not law.
+# Two layers:
+#   1. `hedera-harness doctor --recipe-only` owns schema, defaults, baseline,
+#      and network validity. It is authoritative; this script does not
+#      re-implement it.
+#   2. Local checks for cross-file coherence doctor does not perform — most
+#      importantly the tier-3 contract/validator pairing, which doctor passes.
 #
-# Usage: bash check-spec.sh <root> <slug>
-#   Legacy clone:  <root> = harness clone; expects specs/<slug>.yaml
-#   Extend:       <root> = project root; expects .harness/spec.yaml with name: <slug>
-# Exit 0 = clean. Non-zero = one finding printed per line on stderr/stdout.
+# Line-oriented only (grep/awk). No YAML/JSON parser. Treat findings as leads.
+#
+# Usage: bash check-spec.sh <project-root>
+#   <project-root> is the directory containing .harness/
+# Exit 0 = clean. Exit 1 = findings. Exit 2 = usage error.
 
-set -euo pipefail
+set -uo pipefail
 
-if [[ $# -lt 2 ]]; then
-  echo "usage: check-spec.sh <root> <slug>" >&2
+if [[ $# -lt 1 ]]; then
+  echo "usage: check-spec.sh <project-root>" >&2
   exit 2
 fi
 
 ROOT="${1%/}"
-SLUG="$2"
 FINDINGS=0
-LAYOUT=""
+DEGRADED=0
 
 fail() {
   echo "FAIL: $*"
   FINDINGS=$((FINDINGS + 1))
 }
 
-warn_missing() {
-  echo "FAIL: $*"
-  FINDINGS=$((FINDINGS + 1))
-}
+note() { echo "NOTE: $*"; }
 
-SPEC_FILE=""
-PRD=""
-STATIC=""
-COMMANDS=""
-CONTRACT=""
-PLAYWRIGHT=""
-
-if [[ -f "$ROOT/specs/${SLUG}.yaml" ]]; then
-  LAYOUT="run"
-  SPEC_FILE="$ROOT/specs/${SLUG}.yaml"
-elif [[ -f "$ROOT/.harness/spec.yaml" ]]; then
-  LAYOUT="project"
-  SPEC_FILE="$ROOT/.harness/spec.yaml"
-else
-  fail "spec file missing: expected $ROOT/specs/${SLUG}.yaml or $ROOT/.harness/spec.yaml"
+SPEC_FILE="$ROOT/.harness/spec.yaml"
+if [[ ! -f "$SPEC_FILE" ]]; then
+  fail "recipe file missing: $SPEC_FILE"
+  echo "check-spec: 1 finding(s)"
   exit 1
 fi
 
 # --- helpers -----------------------------------------------------------------
 
-# First non-comment match for a YAML key's scalar value (best-effort).
+# First non-comment scalar value for a top-level-ish YAML key.
 yaml_scalar() {
   local file="$1" key="$2"
-  # shellcheck disable=SC2016
-  grep -E "^[[:space:]]*${key}:[[:space:]]*" "$file" 2>/dev/null \
+  grep -E "^[[:space:]]*${key}:[[:space:]]*[^[:space:]]" "$file" 2>/dev/null \
     | grep -v '^[[:space:]]*#' \
     | head -1 \
     | sed -E "s/^[[:space:]]*${key}:[[:space:]]*//; s/[\"']//g; s/[[:space:]]+#.*//; s/[[:space:]]*$//"
@@ -63,223 +52,250 @@ yaml_scalar() {
 
 # True if an uncommented line matching pattern exists.
 has_active() {
-  local file="$1" pattern="$2"
-  grep -E "$pattern" "$file" 2>/dev/null | grep -v '^[[:space:]]*#' | grep -q .
+  grep -E "$2" "$1" 2>/dev/null | grep -v '^[[:space:]]*#' | grep -q .
 }
 
-# --- resolve paths from spec file -------------------------------------------
+# True if `enabled: true` appears inside the given top-level block.
+block_enabled() {
+  awk -v key="$2" '
+    /^[[:space:]]*#/ { next }
+    $0 ~ "^[[:space:]]*" key ":[[:space:]]*$" { in_b=1; next }
+    in_b && /^[^[:space:]#]/ { exit }
+    in_b && /^[[:space:]]*enabled:[[:space:]]*true/ { found=1; exit }
+    END { exit found ? 0 : 1 }
+  ' "$1"
+}
 
-PRD_REL="$(yaml_scalar "$SPEC_FILE" "prd" || true)"
-if [[ -n "$PRD_REL" ]]; then
-  PRD="$ROOT/$PRD_REL"
-fi
+# Resolve a path key, falling back to the v2 default when the key is absent.
+resolve_path() {
+  local key="$1" default="$2" value
+  value="$(yaml_scalar "$SPEC_FILE" "$key")"
+  [[ -z "$value" ]] && value="$default"
+  echo "$ROOT/$value"
+}
 
-STATIC_REL="$(yaml_scalar "$SPEC_FILE" "static" || true)"
-# validators.static is nested; also try after validators: block
-if [[ -z "$STATIC_REL" ]] || { [[ "$STATIC_REL" != validators/* ]] && [[ "$STATIC_REL" != .harness/* ]]; }; then
-  STATIC_REL="$(grep -E '^[[:space:]]*static:[[:space:]]*' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | head -1 | sed -E 's/^[[:space:]]*static:[[:space:]]*//; s/[\"'\'']//g; s/[[:space:]]*$//' || true)"
-fi
-if [[ -n "$STATIC_REL" ]]; then
-  STATIC="$ROOT/$STATIC_REL"
-fi
+# --- layer 1: delegate schema validity to the harness -------------------------
 
-COMMANDS_REL="$(grep -E '^[[:space:]]*commands:[[:space:]]*(validators/|\.harness/)' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | head -1 | sed -E 's/^[[:space:]]*commands:[[:space:]]*//; s/[\"'\'']//g; s/[[:space:]]*$//' || true)"
-if [[ -n "$COMMANDS_REL" ]]; then
-  COMMANDS="$ROOT/$COMMANDS_REL"
-fi
+echo "== recipe (hedera-harness doctor --recipe-only) =="
 
-CONTRACT_REL="$(yaml_scalar "$SPEC_FILE" "contract" || true)"
-if [[ -n "$CONTRACT_REL" ]] && { [[ "$CONTRACT_REL" == contracts/* ]] || [[ "$CONTRACT_REL" == .harness/* ]]; }; then
-  CONTRACT="$ROOT/$CONTRACT_REL"
-fi
-
-PLAY_REL="$(grep -E '^[[:space:]]*playwright:[[:space:]]*' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | head -1 | sed -E 's/^[[:space:]]*playwright:[[:space:]]*//; s/[\"'\'']//g; s/[[:space:]]*$//' || true)"
-if [[ -n "$PLAY_REL" ]]; then
-  PLAYWRIGHT="$ROOT/$PLAY_REL"
-fi
-
-# --- slug agreement ----------------------------------------------------------
-
-SPEC_NAME="$(yaml_scalar "$SPEC_FILE" "name" || true)"
-if [[ "$SPEC_NAME" != "$SLUG" ]]; then
-  fail "spec file name='$SPEC_NAME' does not match slug='$SLUG'"
-fi
-
-TM_NAME="$(grep -A5 '^templateMetadata:' "$SPEC_FILE" | grep -E '^[[:space:]]*name:' | head -1 | sed -E 's/^[[:space:]]*name:[[:space:]]*//; s/[\"'\'']//g; s/[[:space:]]*$//' || true)"
-
-if [[ "$LAYOUT" == "run" ]]; then
-  if [[ -n "$TM_NAME" ]] && [[ "$TM_NAME" != "$SLUG" ]]; then
-    fail "templateMetadata.name='$TM_NAME' does not match slug='$SLUG'"
-  fi
-
-  if [[ -n "$PRD_REL" ]] && [[ "$PRD_REL" != *"$SLUG"* ]]; then
-    fail "prd path '$PRD_REL' does not contain slug='$SLUG'"
-  fi
-
-  if [[ -n "$STATIC" ]] && [[ -f "$STATIC" ]]; then
-    if ! grep -E "\"equals\"[[:space:]]*:[[:space:]]*\"${SLUG}\"" "$STATIC" >/dev/null; then
-      fail "static validator missing template.json name equals '$SLUG'"
-    fi
-  elif [[ -n "$STATIC_REL" ]]; then
-    warn_missing "static validator missing: $STATIC"
-  fi
-
-  if [[ -n "$CONTRACT" ]] && [[ -f "$CONTRACT" ]]; then
-    if ! grep -E "\"template\"[[:space:]]*:[[:space:]]*\"${SLUG}\"" "$CONTRACT" >/dev/null; then
-      fail "oracle template field does not equal slug='$SLUG'"
-    fi
-  fi
+# Prefer a harness on PATH, else one installed in the project.
+DOCTOR_OUT=""
+DOCTOR_RC=0
+if command -v hedera-harness >/dev/null 2>&1; then
+  DOCTOR_OUT="$(hedera-harness doctor "$SPEC_FILE" --recipe-only 2>&1)"; DOCTOR_RC=$?
+elif [[ -x "$ROOT/node_modules/.bin/hedera-harness" ]]; then
+  DOCTOR_OUT="$("$ROOT/node_modules/.bin/hedera-harness" doctor "$SPEC_FILE" --recipe-only 2>&1)"; DOCTOR_RC=$?
 else
-  # Extend: templateMetadata.name is host identity; may differ from extension slug.
-  # Static / oracle often omit template.json name equals — skip those checks.
-  if [[ -n "$STATIC_REL" ]] && [[ ! -f "$STATIC" ]]; then
-    warn_missing "static validator missing: $STATIC"
+  DOCTOR_RC=127
+fi
+
+if [[ "$DOCTOR_RC" -eq 127 ]]; then
+  DEGRADED=1
+  note "hedera-harness not on PATH and not installed in $ROOT — schema not validated."
+  note "Install it, or run: npx hedera-harness@latest doctor .harness/spec.yaml --recipe-only"
+elif grep -q 'Expected command' <<<"$DOCTOR_OUT"; then
+  # A pre-1.2.0 harness has no `doctor` verb.
+  DEGRADED=1
+  note "the installed hedera-harness is older than 1.2.0 (no 'doctor' command) — schema not validated."
+  note "Upgrade it, or run: npx hedera-harness@latest doctor .harness/spec.yaml --recipe-only"
+else
+  echo "$DOCTOR_OUT"
+  [[ "$DOCTOR_RC" -ne 0 ]] && FINDINGS=$((FINDINGS + 1))
+fi
+
+if [[ "$DEGRADED" -eq 1 ]]; then
+  # Minimal stand-in so an unusable CLI does not hide an obviously broken recipe.
+  SCHEMA="$(yaml_scalar "$SPEC_FILE" "schemaVersion")"
+  if [[ "$SCHEMA" != "2" ]]; then
+    fail "schemaVersion is '${SCHEMA:-absent}', expected 2 — run: hedera-harness migrate"
   fi
-  if [[ -n "$CONTRACT_REL" ]] && [[ ! -f "$CONTRACT" ]]; then
-    warn_missing "oracle missing: $CONTRACT"
+  if ! has_active "$SPEC_FILE" '^[[:space:]]*baseline:'; then
+    fail "recipe requires a baseline: block"
+  elif ! awk '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*baseline:/ { in_b=1; next }
+    in_b && /^[^[:space:]#]/ { exit }
+    in_b && /name:[[:space:]]*install[[:space:]]*$/ { found=1; exit }
+    END { exit found ? 0 : 1 }
+  ' "$SPEC_FILE"; then
+    fail "baseline must include a command literally named \"install\""
   fi
 fi
 
-# --- REPLACE_ME --------------------------------------------------------------
+echo
+echo "== coherence =="
 
-FILES_TO_SCAN=("$SPEC_FILE")
-[[ -n "$PRD" && -f "$PRD" ]] && FILES_TO_SCAN+=("$PRD")
-[[ -n "$STATIC" && -f "$STATIC" ]] && FILES_TO_SCAN+=("$STATIC")
-[[ -n "$COMMANDS" && -f "$COMMANDS" ]] && FILES_TO_SCAN+=("$COMMANDS")
-[[ -n "$CONTRACT" && -f "$CONTRACT" ]] && FILES_TO_SCAN+=("$CONTRACT")
-[[ -n "$PLAYWRIGHT" && -f "$PLAYWRIGHT" ]] && FILES_TO_SCAN+=("$PLAYWRIGHT")
+# --- removed-in-v2 keys -------------------------------------------------------
 
-if grep -R --line-number "REPLACE_ME" "${FILES_TO_SCAN[@]}" >/dev/null 2>&1; then
+for dead in seed generator logging extend; do
+  if has_active "$SPEC_FILE" "^[[:space:]]*${dead}:"; then
+    fail "'${dead}:' was removed in schema v2 — run: hedera-harness migrate .harness/spec.yaml"
+  fi
+done
+
+# --- resolve the recipe's files (honouring v2 defaults) -----------------------
+
+STATIC="$(resolve_path static .harness/validators/static.json)"
+COMMANDS="$(resolve_path commands .harness/validators/yarn.json)"
+CONTRACT_REL="$(yaml_scalar "$SPEC_FILE" "contract")"
+PLAY_REL="$(yaml_scalar "$SPEC_FILE" "playwright")"
+
+# `prd` may be a scalar or a list of increments.
+PRDS=()
+PRD_SCALAR="$(yaml_scalar "$SPEC_FILE" "prd")"
+if [[ -n "$PRD_SCALAR" ]]; then
+  PRDS+=("$ROOT/$PRD_SCALAR")
+else
   while IFS= read -r line; do
-    fail "REPLACE_ME leftover: $line"
-  done < <(grep -R --line-number "REPLACE_ME" "${FILES_TO_SCAN[@]}" 2>/dev/null || true)
+    [[ -n "$line" ]] && PRDS+=("$ROOT/$line")
+  done < <(awk '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*prd:[[:space:]]*$/ { in_p=1; next }
+    in_p && /^[[:space:]]*-[[:space:]]*/ {
+      sub(/^[[:space:]]*-[[:space:]]*/, ""); gsub(/["'\'']/, ""); print; next
+    }
+    in_p { exit }
+  ' "$SPEC_FILE")
+  [[ ${#PRDS[@]} -eq 0 ]] && PRDS+=("$ROOT/.harness/prd.md")
 fi
 
-# --- install command name ----------------------------------------------------
+for prd in "${PRDS[@]}"; do
+  [[ -f "$prd" ]] || fail "prd missing on disk: $prd"
+done
+[[ -f "$STATIC" ]]   || fail "static validator missing: $STATIC"
+[[ -f "$COMMANDS" ]] || fail "command validator missing: $COMMANDS"
 
-if [[ -n "$COMMANDS" ]] && [[ -f "$COMMANDS" ]]; then
-  if ! grep -E '"name"[[:space:]]*:[[:space:]]*"install"' "$COMMANDS" >/dev/null; then
-    fail "command validator missing a command literally named \"install\""
-  fi
-elif [[ -n "$COMMANDS_REL" ]]; then
-  warn_missing "command validator missing: $COMMANDS"
-else
-  fail "could not resolve validators.commands path from spec file"
+# --- post-feature command validator needs an install --------------------------
+
+if [[ -f "$COMMANDS" ]]; then
+  grep -E '"name"[[:space:]]*:[[:space:]]*"install"' "$COMMANDS" >/dev/null \
+    || fail "command validator missing a command literally named \"install\""
 fi
 
-# --- extend.baseline (project layout) ------------------------------------
+# --- REPLACE_ME ---------------------------------------------------------------
 
-if [[ "$LAYOUT" == "project" ]]; then
-  if ! has_active "$SPEC_FILE" '^[[:space:]]*extend:'; then
-    fail "project layout requires an extend: block"
-  elif ! grep -A20 -E '^[[:space:]]*extend:' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | grep -E '^[[:space:]]*baseline:' >/dev/null; then
-    fail "project layout requires extend.baseline"
-  elif ! grep -A40 -E '^[[:space:]]*baseline:' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | grep -E '^[[:space:]]*-?[[:space:]]*name:[[:space:]]*install[[:space:]]*$' >/dev/null; then
-    fail "extend.baseline missing a command literally named \"install\""
-  fi
-fi
+SCAN=("$SPEC_FILE")
+for f in "${PRDS[@]}" "$STATIC" "$COMMANDS"; do
+  [[ -f "$f" ]] && SCAN+=("$f")
+done
+while IFS= read -r line; do
+  [[ -n "$line" ]] && fail "REPLACE_ME leftover: $line"
+done < <(grep -Rn "REPLACE_ME" "${SCAN[@]}" 2>/dev/null || true)
 
-# --- Tier 3 pairing: contract + validator.enabled ----------------------------
+# --- tier 3 pairing (doctor does NOT catch this) ------------------------------
 
 HAS_CONTRACT=false
-HAS_VALIDATOR_ENABLED=false
+has_active "$SPEC_FILE" '^[[:space:]]*contract:[[:space:]]*[^[:space:]]' && HAS_CONTRACT=true
 
-if has_active "$SPEC_FILE" '^[[:space:]]*contract:[[:space:]]*'; then
-  HAS_CONTRACT=true
+HAS_VALIDATOR=false
+block_enabled "$SPEC_FILE" "validator" && HAS_VALIDATOR=true
+
+if $HAS_CONTRACT && ! $HAS_VALIDATOR; then
+  fail "tier 3 incomplete: contract present but validator.enabled is not true"
+fi
+if $HAS_VALIDATOR && ! $HAS_CONTRACT; then
+  fail "tier 3 incomplete: validator.enabled true but contract missing"
 fi
 
-# Look for enabled: true under a validator: block (best-effort: any active enabled: true
-# near validator — also accept top-level under validator stanza).
-if grep -E '^[[:space:]]*validator:[[:space:]]*$' "$SPEC_FILE" | grep -v '^[[:space:]]*#' | grep -q .; then
-  # Grab a window after the first active validator: key
-  if awk '
-    /^[[:space:]]*#/ { next }
-    /^[[:space:]]*validator:[[:space:]]*$/ { in_v=1; next }
-    in_v && /^[^[:space:]#]/ { exit }
-    in_v && /^[[:space:]]*enabled:[[:space:]]*true/ { found=1; exit }
-    END { exit found ? 0 : 1 }
-  ' "$SPEC_FILE"; then
-    HAS_VALIDATOR_ENABLED=true
-  fi
+CONTRACT=""
+if [[ -n "$CONTRACT_REL" ]]; then
+  CONTRACT="$ROOT/$CONTRACT_REL"
+  [[ -f "$CONTRACT" ]] || fail "oracle missing: $CONTRACT"
 fi
 
-if $HAS_CONTRACT && ! $HAS_VALIDATOR_ENABLED; then
-  fail "gate 3 incomplete: contract present but validator.enabled is not true"
-fi
-if $HAS_VALIDATOR_ENABLED && ! $HAS_CONTRACT; then
-  fail "gate 3 incomplete: validator.enabled true but contract missing"
+if [[ -n "$PLAY_REL" ]] && [[ ! -f "$ROOT/$PLAY_REL" ]]; then
+  fail "playwright smoke missing: $ROOT/$PLAY_REL"
 fi
 
-# --- chainValidation.network -------------------------------------------------
+# --- v1 validator agent block -------------------------------------------------
 
-if has_active "$SPEC_FILE" '^[[:space:]]*chainValidation:'; then
-  NETWORK="$(awk '
-    /^[[:space:]]*#/ { next }
-    /^[[:space:]]*chainValidation:/ { in_c=1; next }
-    in_c && /^[^[:space:]#]/ { exit }
-    in_c && /^[[:space:]]*network:/ {
-      sub(/^[[:space:]]*network:[[:space:]]*/, "")
-      gsub(/["'\'']/, "")
-      print
-      exit
-    }
-  ' "$SPEC_FILE" || true)"
-  if [[ -n "$NETWORK" ]] && [[ "$NETWORK" != "testnet" ]]; then
-    fail "chainValidation.network='$NETWORK' (must be testnet)"
-  fi
-  if [[ -z "$NETWORK" ]]; then
-    fail "chainValidation present but network field not found"
-  fi
+if awk '
+  /^[[:space:]]*#/ { next }
+  /^[[:space:]]*validator:[[:space:]]*$/ { in_v=1; next }
+  in_v && /^[^[:space:]#]/ { exit }
+  in_v && /^[[:space:]]*(provider|command|args|model):/ { found=1; exit }
+  END { exit found ? 0 : 1 }
+' "$SPEC_FILE"; then
+  fail "validator carries v1 agent flags — use the 'agent:' preset instead"
 fi
 
-# --- executableWithTestSigner requires chainValidation -----------------------
+# --- executableWithTestSigner requires chainValidation ------------------------
 
-HAS_EXEC=false
 if [[ -n "$CONTRACT" ]] && [[ -f "$CONTRACT" ]]; then
   if grep -E '"executableWithTestSigner"[[:space:]]*:[[:space:]]*true' "$CONTRACT" >/dev/null; then
-    HAS_EXEC=true
+    block_enabled "$SPEC_FILE" "chainValidation" \
+      || fail "executableWithTestSigner=true in oracle but chainValidation.enabled is not true"
   fi
 fi
 
-HAS_CHAIN=false
-if has_active "$SPEC_FILE" '^[[:space:]]*chainValidation:'; then
-  if awk '
-    /^[[:space:]]*#/ { next }
-    /^[[:space:]]*chainValidation:/ { in_c=1; next }
-    in_c && /^[^[:space:]#]/ { exit }
-    in_c && /^[[:space:]]*enabled:[[:space:]]*true/ { found=1; exit }
-    END { exit found ? 0 : 1 }
-  ' "$SPEC_FILE"; then
-    HAS_CHAIN=true
+# --- oracle ↔ PRD traceability ------------------------------------------------
+
+if [[ -n "$CONTRACT" ]] && [[ -f "$CONTRACT" ]]; then
+  # Count occurrences, not matching lines — contracts may be compact JSON.
+  ASSERTIONS=$(grep -oE '"id"[[:space:]]*:[[:space:]]*"C[0-9]+"' "$CONTRACT" 2>/dev/null | wc -l | tr -d ' ')
+  [[ "${ASSERTIONS:-0}" -eq 0 ]] && fail "oracle has no numbered assertions (C1, C2, …)"
+
+  CRITICAL=$(grep -oE '"severity"[[:space:]]*:[[:space:]]*"critical"' "$CONTRACT" 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "${CRITICAL:-0}" -gt 2 ]]; then
+    fail "oracle has ${CRITICAL} critical assertions (prefer <= 2; the run will rarely pass)"
+  fi
+
+  grep -E '"failOnUncertainty"' "$CONTRACT" >/dev/null \
+    || fail "oracle missing evaluationRules.failOnUncertainty (fail-closed posture)"
+
+  # Journeys are numbered list items under a "## Journeys" heading.
+  JOURNEYS=0
+  for prd in "${PRDS[@]}"; do
+    [[ -f "$prd" ]] || continue
+    n=$(awk '/^##[[:space:]]*Journeys/ { in_j=1; next }
+             in_j && /^##/ { exit }
+             in_j && /^[[:space:]]*[0-9]+\./ { c++ }
+             END { print c+0 }' "$prd")
+    JOURNEYS=$((JOURNEYS + n))
+  done
+  if [[ "$JOURNEYS" -gt 0 ]] && [[ "${ASSERTIONS:-0}" -lt "$JOURNEYS" ]]; then
+    fail "oracle has ${ASSERTIONS} assertion(s) for ${JOURNEYS} PRD journey(s) — some journey is ungraded"
   fi
 fi
 
-if $HAS_EXEC && ! $HAS_CHAIN; then
-  fail "executableWithTestSigner=true in oracle but chainValidation.enabled is not true"
+# --- authoring skills must not leak into the generator list -------------------
+
+if awk '
+  /^[[:space:]]*#/ { next }
+  /^[[:space:]]*skills:[[:space:]]*$/ { in_s=1; next }
+  in_s && /^[^[:space:]#-]/ { exit }
+  in_s && /(create-harness-spec|review-harness-spec|harness-spec-anatomy)/ { found=1; exit }
+  END { exit found ? 0 : 1 }
+' "$SPEC_FILE"; then
+  fail "skills: lists an authoring skill — that list is for generator skills only"
 fi
 
-# --- blind check on PRD ------------------------------------------------------
+# --- blind check on every PRD -------------------------------------------------
 
-if [[ -n "$PRD" ]] && [[ -f "$PRD" ]]; then
-  if grep -E '\bC[0-9]+\b' "$PRD" >/dev/null; then
-    fail "blind: PRD contains assertion id (C1, C2, …)"
-  fi
-  if grep -E 'howToVerify' "$PRD" >/dev/null; then
-    fail "blind: PRD contains howToVerify"
-  fi
-  if grep -Ei 'severity[[:space:]]*:[[:space:]]*(critical|major|minor)' "$PRD" >/dev/null; then
-    fail "blind: PRD contains severity label"
-  fi
-elif [[ -n "$PRD_REL" ]]; then
-  warn_missing "prd missing on disk: $PRD"
-fi
+for prd in "${PRDS[@]}"; do
+  [[ -f "$prd" ]] || continue
+  label="$(basename "$prd")"
+  grep -E '\bC[0-9]+\b' "$prd" >/dev/null \
+    && fail "blind: $label contains an assertion id (C1, C2, …)"
+  grep -E 'howToVerify' "$prd" >/dev/null \
+    && fail "blind: $label contains howToVerify"
+  grep -Ei 'severity[[:space:]]*:[[:space:]]*(critical|major|minor)' "$prd" >/dev/null \
+    && fail "blind: $label contains a severity label"
+done
 
-# --- summary -----------------------------------------------------------------
+# --- summary ------------------------------------------------------------------
 
+echo
 if [[ "$FINDINGS" -gt 0 ]]; then
-  echo "check-spec: $FINDINGS finding(s) (layout=$LAYOUT)"
+  echo "check-spec: $FINDINGS finding(s)"
+  [[ "$DEGRADED" -eq 1 ]] && echo "check-spec: schema NOT validated (see NOTE above)"
   exit 1
 fi
 
-echo "check-spec: OK (layout=$LAYOUT)"
+if [[ "$DEGRADED" -eq 1 ]]; then
+  echo "check-spec: coherence OK, but schema NOT validated (see NOTE above)"
+  exit 1
+fi
+
+echo "check-spec: OK"
 exit 0

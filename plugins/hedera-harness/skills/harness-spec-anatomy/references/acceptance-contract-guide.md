@@ -1,16 +1,22 @@
 # Acceptance contract guide
 
-The acceptance contract is the **oracle** for gate 3. The semantic validator
+The acceptance contract is the **oracle** for tier 3. The semantic validator
 grades the running app against these assertions — not the raw PRD. Keep the
-run **blind**. Path is `contracts/<name>-acceptance.json` (**legacy clone**) or
-`.harness/contracts/<slug>-acceptance.json` (**project**).
+run **blind**. Default path is `.harness/acceptance-contract.json`.
 Terms: [GLOSSARY.md](../GLOSSARY.md).
 
-Source of truth in the harness repo:
-`skeletons/new-template/acceptance-contract.json`
-([raw on main](https://raw.githubusercontent.com/hedera-dev/hedera-harness/main/skeletons/new-template/acceptance-contract.json)).
-Set `"prd"` to the layout-appropriate PRD path (`docs/prds/...` or
-`.harness/prd.md`).
+The harness does not ship an acceptance-contract skeleton — the worked example
+below is the reference. Enable it with **both** keys, or the tier is
+misconfigured:
+
+```yaml
+contract: .harness/acceptance-contract.json
+validator:
+  enabled: true
+```
+
+Set `"prd"` to the PRD path (`.harness/prd.md`, or the specific increment file
+when `prd:` is a list).
 
 ## Derive assertions from PRD journeys
 
@@ -29,13 +35,13 @@ Set `"prd"` to the layout-appropriate PRD path (`docs/prds/...` or
 | `severity` | `critical` \| `major` \| `minor` |
 | `walletRequired` | Whether the flow needs a wallet |
 | `verifiableWithoutCredentials` | Can pass with no `.env` / funded account |
-| `executableWithTestSigner` | Only with gate 3.5 `chainValidation`; run real tx + mirror check |
+| `executableWithTestSigner` | Only with tier 3.5 `chainValidation`; run real tx + mirror check |
 | `statement` | What must be true |
 | `howToVerify` | Concrete browser (and mirror) steps |
 
 ## evaluationRules posture
 
-Keep fail-closed language (matches the skeleton):
+Keep fail-closed language (matches the worked example below):
 
 - `posture: adversarial`
 - `failOnUncertainty` — absence of evidence is a failure
@@ -61,7 +67,7 @@ PRD journeys: browse empty feed; wallet-gated "post message".
 {
   "name": "hcs-feed-acceptance",
   "template": "hcs-feed",
-  "prd": "docs/prds/hcs-feed.md",
+  "prd": ".harness/prd.md",
   "version": 1,
   "description": "Browser-verifiable acceptance contract for hcs-feed.",
   "routes": ["/", "/feed"],
@@ -114,4 +120,4 @@ PRD journeys: browse empty feed; wallet-gated "post message".
 ```
 
 Add a fourth assertion with `"executableWithTestSigner": true` only when enabling
-`chainValidation` (gate 3.5).
+`chainValidation` (tier 3.5).
