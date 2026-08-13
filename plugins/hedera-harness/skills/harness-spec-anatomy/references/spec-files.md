@@ -1,152 +1,142 @@
-# Spec files
+# Recipe files
 
-Compact Tier 0–1 bodies for reconstructing a **spec** without a harness clone.
-Prefer copying `skeletons/new-template/` when available. After writing, replace
-every `my-template` with the **slug**. Terms: [GLOSSARY.md](../GLOSSARY.md).
+Compact tier 0–1 bodies for writing a **recipe** by hand. Terms:
+[GLOSSARY.md](../GLOSSARY.md).
+
+Prefer copying the shipped skeleton when the harness is installed — it is always
+current and self-documenting:
+
+```bash
+cp -r "$(npm root -g)/hedera-harness/skeletons/project-harness/." .harness/
+# or, from a local clone: cp -r <harness>/skeletons/project-harness/. .harness/
+```
+
+`hedera-harness init <dir>` provisions the same files as part of bootstrapping a
+project. Reconstruct from this page only when neither is available.
 
 ## File table
 
-| File | Required? | Consumed by |
-|------|-----------|-------------|
-| `docs/prds/<name>.md` | Yes | Generator |
-| `specs/<name>.yaml` (**spec file**) | Yes | Harness CLI |
-| `validators/<name>-static.json` | Yes | Gate 0–1 |
-| `validators/<name>-yarn.json` | Yes | Gate 0–1 |
-| `playwright/<name>-smoke.yaml` | Gate 2 | Playwright **gate** |
-| `contracts/<name>-acceptance.json` | Gate 3 | Semantic validator (**oracle**) |
+Paths relative to the scaffolded project root (parent of `.harness/`). Every
+path is the **default** — omit the key unless you are pointing elsewhere.
 
-## Compact Tier 0–1 bodies
+| File | Required? | Default path |
+|------|-----------|--------------|
+| **Recipe file** | Yes | `.harness/spec.yaml` |
+| PRD | Yes | `.harness/prd.md` |
+| Static validator | Tier 0–1 | `.harness/validators/static.json` |
+| Command validator | Tier 0–1 | `.harness/validators/yarn.json` |
+| Playwright smoke | Tier 2 | `.harness/validators/playwright-smoke.yaml` |
+| **Oracle** | Tier 3 | `.harness/acceptance-contract.json` |
 
-### `specs/my-template.yaml`
+## The minimum viable recipe
+
+This is complete and correct. Do not pad it.
 
 ```yaml
-name: my-template
-description: REPLACE_ME — one-line description of this Hedera demo benchmark.
+schemaVersion: 2
 
-prd: docs/prds/my-template.md
-# contract: contracts/my-template-acceptance.json
+name: my-feature
+description: What you want the agent to build in this project.
 
-seed:
-  repo: https://github.com/hedera-dev/scaffold-hbar.git
-  ref: main
-  preflight:
-    commands:
-      - name: seed-install
-        command: yarn install
-        timeoutMs: 300000
-  isolation:
-    neverModifySeedRepo: true
+baseline:
+  commands:
+    - name: install          # required — also used for install fingerprinting
+      command: yarn install
+    - name: build
+      command: yarn next:build
+```
 
-generator:
-  provider: command
-  command: agent
-  args:
-    - -p
-    - --trust
-    - --sandbox
-    - enabled
-    - --workspace
-    - "{workspace}"
-    - --model
-    - composer-2.5
-    - --force
-    - --output-format
-    - stream-json
-    - --stream-partial-output
-  timeoutMs: 3600000
+## `.harness/spec.yaml` — with the optional blocks
 
-# validator:
-#   enabled: true
-#   provider: command
-#   command: agent
-#   args:
-#     - -p
-#     - --trust
-#     - --force
-#     - --sandbox
-#     - disabled
-#     - --approve-mcps
-#     - --workspace
-#     - "{workspace}"
-#     - --model
-#     - composer-2.5
-#     - --output-format
-#     - stream-json
-#     - --stream-partial-output
-#   timeoutMs: 600000
+Everything below `baseline` is the harness default. Uncomment only to override;
+changing a commented default here changes nothing.
 
+```yaml
+schemaVersion: 2
+
+name: my-feature
+description: In-place feature for an already-scaffolded app.
+
+baseline:
+  commands:
+    - name: install
+      command: yarn install
+      timeoutMs: 300000      # default is 10 minutes
+    - name: lint
+      command: yarn lint
+    - name: build
+      command: yarn next:build
+
+# Which coding agent runs the generator. Presets ship with the harness, so flag
+# and model changes arrive with an upgrade instead of an edit here.
+# agent: cursor              # or: claude
+
+# Feature description. A list delivers ordered increments onto one branch,
+# each with its own attempt budget; a failing increment stops the sequence.
+# prd: .harness/prd.md
+#
+# prd:
+#   - .harness/prds/01-foundation.md
+#   - .harness/prds/02-ui.md
+
+# maxAttempts: 3             # repair attempts per run before stopping
+
+# Generator skills — domain knowledge for the coding agent. Never authoring
+# skills. Names come from the harness skills-index.json.
 # skills:
 #   - hedera-consensus-service
 #   - project-scaffolding
 
-constraints:
-  packageManager: yarn@3.2.3
-  workspaces:
-    - packages/nextjs
-  forbiddenCommands:
-    - npm install
-    - npm run
-    - pnpm install
-    - pnpm run
+# validators:
+#   static: .harness/validators/static.json
+#   commands: .harness/validators/yarn.json
 
-templateMetadata:
-  name: my-template
-  frontend: nextjs-app
-  solidityFramework: none
+# Detected from the project when omitted: packageManager comes from
+# package.json / lockfiles, and forbiddenCommands is every manager that is not
+# the one in use.
+# constraints:
+#   packageManager: yarn@3.2.3
+#   workspaces:
+#     - packages/nextjs
+#   forbiddenWorkspaces:
+#     - packages/hardhat
 
-validators:
-  static: validators/my-template-static.json
-  commands: validators/my-template-yarn.json
-  # playwright: playwright/my-template-smoke.yaml
+# Host template identity — may differ from the feature slug in `name`.
+# templateMetadata:
+#   name: hedera-demo
+#   frontend: nextjs-app
+#   solidityFramework: none
 
-requiredFiles:
-  - template.json
-  - README.md
-  - AGENTS.md
-  - package.json
-  - packages/nextjs/package.json
+# Defaults to .env plus one per workspace, for both the file check and the
+# content scan.
+# forbiddenFiles:
+#   - .env
+# secretScan:
+#   failOnFiles:
+#     - .env
+#   patterns:
+#     - name: private-key-assignment
+#       pattern: "(PRIVATE_KEY|OPERATOR_KEY)\\s*=\\s*(0x)?[0-9a-fA-F]{32,}"
 
-forbiddenFiles:
-  - .env
-  - packages/nextjs/.env
+# Files the run must produce. Empty by default — the validators are the gate.
+# requiredFiles:
+#   - packages/nextjs/app/my-feature/page.tsx
 
-secretScan:
-  failOnFiles:
-    - .env
-    - packages/nextjs/.env
-  patterns:
-    - name: private-key-assignment
-      pattern: "(PRIVATE_KEY|OPERATOR_KEY|HEDERA_OPERATOR_PRIVATE_KEY)\\s*=\\s*(0x)?[0-9a-fA-F]{32,}"
-
-maxAttempts: 3
-
-logging:
-  jsonl: runs/harness.log.jsonl
-  notes: runs/harness-notes.md
+# ── Higher tiers (opt-in) ────────────────────────────────────────────────────
+# See tier-strategy.md. Tier 3 needs both `contract` and `validator.enabled`.
 ```
 
-Key loader fields: `prd`, `seed`, `generator`, `validators.static`,
-`validators.commands`, `templateMetadata`, `requiredFiles`, `forbiddenFiles`,
-`secretScan`, `maxAttempts`. Optional later: `contract`, `validator`,
-`validators.playwright`, `chainValidation`, `skills`.
+Removed in v2 — never author these: `seed`, `generator`, `logging`, `extend`,
+`extend.baseline`. If you find them, the recipe predates v2; run
+`hedera-harness migrate .harness/spec.yaml`.
 
-### `validators/my-template-static.json`
+## `.harness/validators/static.json`
 
 ```json
 {
-  "name": "my-template-static",
-  "description": "Static invariants for my-template. Adjust equals/contains to match the PRD and template.json targets.",
+  "name": "my-feature-static",
+  "description": "Static invariants for my-feature. Adjust equals/contains to match the PRD deliverables.",
   "jsonAssertions": [
-    {
-      "file": "template.json",
-      "path": "name",
-      "equals": "my-template"
-    },
-    {
-      "file": "template.json",
-      "path": "create-scaffold-hbar.capabilities.frontend",
-      "equals": ["nextjs-app"]
-    },
     {
       "file": "package.json",
       "path": "packageManager",
@@ -155,11 +145,10 @@ Key loader fields: `prd`, `seed`, `generator`, `validators.static`,
   ],
   "fileAssertions": {
     "required": [
-      "template.json",
       "README.md",
-      "AGENTS.md",
       "package.json",
-      "packages/nextjs/package.json"
+      "packages/nextjs/package.json",
+      "packages/nextjs/app/my-feature/page.tsx"
     ],
     "forbidden": [".env", "packages/nextjs/.env"]
   },
@@ -167,31 +156,26 @@ Key loader fields: `prd`, `seed`, `generator`, `validators.static`,
     {
       "file": "README.md",
       "contains": ["yarn install", "yarn next:dev"]
-    },
-    {
-      "file": "AGENTS.md",
-      "contains": ["yarn next:dev"]
     }
   ]
 }
 ```
 
-Pin **needles** to scripts the template will actually document — not incidental
+Pin **needles** to scripts the project will actually document — not incidental
 implementation detail that will churn.
 
-### `validators/my-template-yarn.json`
+Assert on the *feature deliverables*, not on `template.json`:
+create-scaffold-hbar removes `template.json` when it scaffolds an app, so an
+assertion against it will fail in a scaffolded project.
+
+## `.harness/validators/yarn.json`
 
 ```json
 {
-  "name": "my-template-yarn",
-  "description": "Yarn commands for my-template. Keep install named \"install\" so the harness can skip it across attempts when the lockfile fingerprint is unchanged.",
+  "name": "my-feature-yarn",
+  "description": "Post-feature command gate for my-feature.",
   "requiresNoSecrets": true,
-  "forbiddenCommands": [
-    "npm install",
-    "npm run",
-    "pnpm install",
-    "pnpm run"
-  ],
+  "forbiddenCommands": ["npm install", "npm run", "pnpm install", "pnpm run"],
   "commands": [
     {
       "name": "install",
@@ -203,28 +187,31 @@ implementation detail that will churn.
       "name": "lint",
       "command": "yarn lint",
       "timeoutMs": 180000,
-      "purpose": "Run the template lint script."
+      "purpose": "Run the project lint script."
     },
     {
       "name": "build",
       "command": "yarn next:build",
       "timeoutMs": 300000,
-      "purpose": "Production build (includes TypeScript checks for Next.js templates)."
+      "purpose": "Production build (includes TypeScript checks for Next.js)."
     }
   ]
 }
 ```
 
-The command with `"name": "install"` is load-bearing: the harness fingerprints
-it across repair attempts. Renaming it silently disables the skip.
+This file grades the project **after** the feature lands. It is separate from
+`baseline`, which proves the project was healthy **before** generation. Both
+want a command named `install`.
 
 ## PRD stub
 
-See [prd-and-journeys.md](prd-and-journeys.md). Write
-`docs/prds/my-template.md` with Goal / Journeys / Hedera services / Non-goals /
-Deliverables / Acceptance pointer.
+See [prd-and-journeys.md](prd-and-journeys.md). Write `.harness/prd.md` with
+Goal / Journeys / Hedera services / Non-goals / Deliverables / Acceptance
+pointer. For **increments**, write one file per increment under
+`.harness/prds/` and list them in order.
 
-## Gate 2 / 3 / 3.5 bodies
+## Tier 2 / 3 / 3.5 bodies
 
-Do not embed here — they drift. Copy from the harness skeletons or follow
-[tier-strategy.md](tier-strategy.md).
+Do not embed them here — they drift. Follow
+[tier-strategy.md](tier-strategy.md) and
+[acceptance-contract-guide.md](acceptance-contract-guide.md).

@@ -1,92 +1,109 @@
-# Gate strategy
+# Tier strategy
 
-Enable **gates** in order. The skeleton defaults to **gate 0–1 only** so the
-first run stays cheap. Uncomment higher gates only after lower ones are green.
-Terms: [GLOSSARY.md](../GLOSSARY.md).
+Enable **tiers** in order. The default is **tier 0–1 only** so the first run
+stays cheap. Add higher tiers only after the lower ones are green. Terms:
+[GLOSSARY.md](../GLOSSARY.md).
 
-Pinned skeleton source (prefer a local harness clone when present):
-
-- Repo: https://github.com/hedera-dev/hedera-harness
-- Ref: `main`
-- Directory: `skeletons/new-template/`
-
-Raw stubs:
-
-- [playwright-smoke.yaml](https://raw.githubusercontent.com/hedera-dev/hedera-harness/main/skeletons/new-template/playwright-smoke.yaml)
-- [acceptance-contract.json](https://raw.githubusercontent.com/hedera-dev/hedera-harness/main/skeletons/new-template/acceptance-contract.json)
-- [spec.yaml](https://raw.githubusercontent.com/hedera-dev/hedera-harness/main/skeletons/new-template/spec.yaml) (commented gate 2 / 3 / 3.5 blocks)
-
-Authoring checklist in the harness repo:
-[docs/authoring-a-template.md](https://github.com/hedera-dev/hedera-harness/blob/main/docs/authoring-a-template.md)
+Upstream source of truth:
+[docs/authoring-a-recipe.md](https://github.com/hedera-dev/hedera-harness/blob/main/docs/authoring-a-recipe.md).
+The shipped skeleton (`skeletons/project-harness/spec.yaml`) carries every tier
+block as commented YAML — copy from there when the harness is installed rather
+than from this page.
 
 ## Enable order
 
-| Gate | Spec file fields | What it checks | Host prerequisites |
-|------|------------------|----------------|--------------------|
-| **0–1** | `validators.static`, `validators.commands`, `requiredFiles`, `forbiddenFiles`, `secretScan` | Files, JSON/text, secrets, yarn install/lint/build | Node ≥ 20, yarn, `agent` on PATH |
-| **2** | `validators.playwright` | Dev server boots; routes HTTP OK; console / forbidden text | `npx playwright install chromium` |
-| **3** | `contract` + `validator` | Semantic agent grades numbered assertions | Playwright MCP usable headless; validator flags `--force`, `--sandbox disabled`, `--approve-mcps` |
-| **3.5** | `chainValidation` (+ gate 3) | Ephemeral ECDSA test signer; real txs; mirror verify | Funded **ECDSA** testnet operator; `HEDERA_OPERATOR_ID` / `HEDERA_OPERATOR_KEY` in the shell |
+| Tier | Recipe file fields | What it checks | Host prerequisites |
+|------|--------------------|----------------|--------------------|
+| **0–1** | `validators.static`, `validators.commands`, `requiredFiles`, `forbiddenFiles`, `secretScan` | Files, JSON/text, secrets, install/lint/build | Node ≥ 20, yarn, the agent CLI on PATH |
+| **2** | `validators.playwright` | Dev server boots; routes reachable and actually rendered; no console errors; no forbidden text | Playwright browser installed |
+| **3** | `contract` + `validator.enabled: true` | Semantic agent grades numbered assertions | Playwright MCP usable headless |
+| **3.5** | `chainValidation` (+ tier 3) | Ephemeral ECDSA test signer; real txs; mirror verify | Funded **ECDSA** testnet operator exported in the shell |
 
-Pass condition: every enabled **gate** must pass. Semantic **infra** failures
-(MCP / browser missing) **abort** the repair loop — they are not app bugs.
+Pass condition: every enabled **tier** must pass. Semantic **infrastructure**
+failures (MCP or browser missing) **abort** the repair loop rather than counting
+as app bugs — the harness will not burn attempts fixing code that was never
+broken.
 
-## Gate 2 — thin Playwright smoke
+Run `hedera-harness doctor` (without `--recipe-only`) to check host
+prerequisites — agent CLI, Playwright browser, MCP reachability — before
+enabling a tier.
 
-Copy `skeletons/new-template/playwright-smoke.yaml` → `playwright/<name>-smoke.yaml`.
-
-Rules:
-
-- `server.command` / `server.url` match how the template starts (often `yarn next:dev` / `http://localhost:3000`)
-- One entry per critical route
-- `forbidden.visibleText` for crash banners
-- Keep thin — rich UX checks belong in the **oracle**
-- Extra YAML `assertions` blocks are documentation for humans / future use; the
-  harness gate currently enforces: server up, route HTTP success, console errors
-  (if enabled), and forbidden visible text
-
-In the **spec file**, uncomment:
+## Tier 2 — thin Playwright smoke
 
 ```yaml
 validators:
-  playwright: playwright/<name>-smoke.yaml
+  playwright: .harness/validators/playwright-smoke.yaml
 ```
 
-## Gate 3 — semantic oracle + validator agent
-
-1. Fill `contracts/<name>-acceptance.json` (see [acceptance-contract-guide.md](acceptance-contract-guide.md)).
-2. Uncomment both in the **spec file**:
+Smoke file shape:
 
 ```yaml
-contract: contracts/<name>-acceptance.json
+name: my-feature-smoke
 
-validator:
-  enabled: true
-  provider: command
-  command: agent
-  args:
-    - -p
-    - --trust
-    - --force
-    - --sandbox
-    - disabled
-    - --approve-mcps
-    - --workspace
-    - "{workspace}"
-    - --model
-    - composer-2.5
-    - --output-format
-    - stream-json
-    - --stream-partial-output
-  timeoutMs: 600000
+server:
+  command: yarn next:dev
+  url: http://localhost:3000
+  timeoutMs: 120000
+
+defaults:
+  failOnConsoleError: true
+
+routes:
+  - name: home
+    path: /
+  - name: feature
+    path: /my-feature
+
+forbidden:
+  visibleText:
+    - Internal Server Error
+    - Application error
+    - Unhandled Runtime Error
 ```
 
-Both `contract` and `validator.enabled: true` are required. One without the
-other is a misconfigured **spec**.
+Rules:
 
-## Gate 3.5 — on-chain (advanced, opt-in)
+- `server.command` / `server.url` match how the project actually starts
+- one entry per critical route
+- `forbidden.visibleText` for crash banners
+- keep it thin — rich UX checks belong in the **oracle**
 
-Only when the user wants real transactions graded. Requires gate 3.
+The tier enforces: server up, route reachable, page rendered (it polls for
+hydrated body text), no console errors, no forbidden text. It exists to fail
+fast before paying for an agent.
+
+## Tier 3 — semantic oracle + validator agent
+
+1. Write `.harness/acceptance-contract.json` (see
+   [acceptance-contract-guide.md](acceptance-contract-guide.md)).
+2. Enable both keys:
+
+```yaml
+contract: .harness/acceptance-contract.json
+validator:
+  enabled: true
+```
+
+Both are required. One without the other is a misconfigured **recipe** — and
+note that `hedera-harness doctor --recipe-only` does **not** catch this pairing,
+so `check-spec.sh` does.
+
+The validator inherits the **agent preset** from `agent:`, including how it
+receives Playwright MCP. Do not hand-write CLI flags or model names into the
+recipe: presets ship with the harness so those change on upgrade. If you find a
+`validator.provider` / `validator.command` / `validator.args` block, it is a v1
+leftover — migrate.
+
+The validator is adversarial and told to fail on uncertainty. If it cannot reach
+the browser it fails the assertion rather than guessing, so a passing tier 3
+verdict means something.
+
+## Tier 3.5 — on-chain (advanced, opt-in)
+
+Only when the user wants real transactions graded. Requires tier 3. The harness
+provisions an ephemeral funded ECDSA testnet account per run, injects it as the
+scaffold burner wallet, and verifies effects against the **mirror node** rather
+than UI toasts.
 
 ```yaml
 chainValidation:
@@ -99,26 +116,37 @@ chainValidation:
   sweepBack: true
   expose:
     browserLocalStorageKey: burnerWallet.pk
-    envVars: []
+    envVars: []               # e.g. [DEPLOYER_PRIVATE_KEY] for Solidity templates
+  # deploy:
+  #   commands:
+  #     - name: deploy-testnet
+  #       command: yarn hardhat:deploy --network hederaTestnet
 ```
 
 Checklist:
 
-- Host has a funded **ECDSA** testnet operator (not ED25519)
-- Env vars exported in the shell — never written into the workspace
-- Oracle assertions that need a real tx set `executableWithTestSigner: true`
-- Template keeps the burner connector enabled so headless signing works
-- For Solidity: optional `deploy.commands` + `expose.envVars` before grading
+- operator is **ECDSA**, not ED25519 — ED25519 has no EVM alias
+- env vars exported in the shell; never written into the workspace
+- the project keeps the burner connector enabled so headless signing works
+- oracle assertions needing a real tx set `executableWithTestSigner: true`
+- for Solidity: map `expose.envVars` and `deploy.commands` so contracts are
+  deployed before the app is graded
 
-`executableWithTestSigner` assertions are **inert** unless `chainValidation`
-is enabled — do not mark them executable "for later" without enabling the block.
+`executableWithTestSigner` assertions are **inert** unless `chainValidation` is
+enabled — do not mark them executable "for later" without enabling the block.
+
+Lifecycle: one account per run directory, reused across repair and continue
+attempts, best-effort sweep back to the operator at run end.
 
 ## Smoke before a full run
 
 ```bash
-npm run harness -- validate specs/<name>.yaml --workspace runs/<id>/workspace
-npm run harness -- validate-semantic specs/<name>.yaml --workspace runs/<id>/workspace
-npm run harness -- run specs/<name>.yaml --max-attempts 3
+hedera-harness doctor .harness/spec.yaml --recipe-only   # recipe alone
+hedera-harness doctor .harness/spec.yaml                 # + host prerequisites
+hedera-harness validate .harness/spec.yaml
+hedera-harness validate-semantic .harness/spec.yaml
+hedera-harness run .harness/spec.yaml --max-attempts 3
 ```
 
-Prefer `/review-harness-spec` on the **spec** before burning generator attempts.
+Prefer `/review-harness-spec` on the **recipe** before burning generator
+attempts.
