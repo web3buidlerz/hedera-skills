@@ -13,6 +13,7 @@ A marketplace of plugins and skills for AI coding agents. Includes Hedera-specif
 # Install individual plugins
 /plugin install agent-kit-plugin
 /plugin install system-contracts
+/plugin install cross-chain
 /plugin install native-services-js
 /plugin install hackathon-helper
 /plugin install hedera-harness
@@ -89,6 +90,27 @@ Technical references for Hedera system contracts — the precompiled smart contr
 **References included (HSS):**
 
 - `api.md` - HSS contract API reference (Solidity signatures)
+
+### cross-chain
+
+Cross-chain interoperability patterns for Hedera — send and receive General Message Passing (GMP) calls via Axelar, with gas payment, allowlisting, and bridge-agnostic orchestration seams.
+
+**Skills included:**
+
+- **axelar-gmp** — Axelar Gateway `callContract`, gas service payment, `AxelarExecutable` receivers, Hedera↔EVM wiring, and `IBridgeSender` / handler split (as used by cross-chain DCA orchestration + HSS).
+
+**Use when:**
+
+- Sending cross-chain contract calls from Hedera via Axelar GMP
+- Implementing `AxelarExecutable` receivers on EVM destinations
+- Wiring destination/source addresses after dual-chain deploys
+- Separating bridge transport from destination business logic
+- Combining HSS scheduled execution with Axelar message dispatch
+
+**References included:**
+
+- `examples.md` - Sender, receiver, orchestrator, and executor skeletons
+- `hedera-axelar.md` - Testnet gateway/gas addresses, Axelar chain names, env vars
 
 ### native-services-js
 
@@ -225,6 +247,11 @@ hedera-skills/
 │   │       │   ├── SKILL.md
 │   │       │   └── references/
 │   │       └── hss-system-contract/
+│   │           ├── SKILL.md
+│   │           └── references/
+│   ├── cross-chain/          # Cross-chain interoperability (Axelar GMP)
+│   │   └── skills/
+│   │       └── axelar-gmp/
 │   │           ├── SKILL.md
 │   │           └── references/
 │   ├── native-services-js/   # Hedera native services + x402 payments
