@@ -92,12 +92,13 @@ Technical references for Hedera system contracts — the precompiled smart contr
 
 ### native-services-js
 
-Comprehensive guides for using Hedera native services with the Hiero JavaScript SDK. Covers setup patterns, transaction lifecycles, and common operations with working code examples.
+Comprehensive guides for using Hedera native services with the Hiero JavaScript SDK, plus x402 pay-per-use payment patterns on Hedera.
 
 **Skills included:**
 
 - **hedera-token-service** — Token creation (fungible and NFT), minting, burning, transfers, key roles, compliance operations (KYC, freeze, wipe, pause), airdrops, and custom fees using the Hiero JS SDK.
 - **hedera-consensus-service** — Topic creation, message submission with chunking support, subscription patterns via mirror nodes, topic management, and common patterns (event logs, pub/sub).
+- **x402-payments** — x402 HTTP 402 pay-per-use with native HBAR: FileRegistry metadata, self-hosted facilitator verify/settle, and HashPack client payment retries.
 
 **Use when:**
 
@@ -106,6 +107,8 @@ Comprehensive guides for using Hedera native services with the Hiero JavaScript 
 - Working with Hedera Consensus Service topics and messages
 - Setting up custom fees, compliance operations, or airdrops
 - Subscribing to topic messages via mirror nodes
+- Gating downloads or APIs behind x402 HBAR payments on Hedera
+- Wiring a self-hosted x402 facilitator or ExactHederaScheme resource server
 
 **References included (HTS):**
 
@@ -115,6 +118,11 @@ Comprehensive guides for using Hedera native services with the Hiero JavaScript 
 **References included (HCS):**
 
 - `api-reference.md` - Hiero JS SDK API reference for HCS
+
+**References included (x402):**
+
+- `examples.md` - FileRegistry, resource server, and client retry skeletons
+- `facilitator.md` - Facilitator endpoints, fee-payer env vars, Docker infra
 
 ### hackathon-helper
 
@@ -219,12 +227,15 @@ hedera-skills/
 │   │       └── hss-system-contract/
 │   │           ├── SKILL.md
 │   │           └── references/
-│   ├── native-services-js/   # Hedera native services (Hiero JS SDK)
+│   ├── native-services-js/   # Hedera native services + x402 payments
 │   │   └── skills/
 │   │       ├── hedera-token-service/
 │   │       │   ├── SKILL.md
 │   │       │   └── references/
-│   │       └── hedera-consensus-service/
+│   │       ├── hedera-consensus-service/
+│   │       │   ├── SKILL.md
+│   │       │   └── references/
+│   │       └── x402-payments/
 │   │           ├── SKILL.md
 │   │           └── references/
 │   ├── hedera-harness/       # Harness spec authoring & review
