@@ -93,11 +93,12 @@ Technical references for Hedera system contracts — the precompiled smart contr
 
 ### cross-chain
 
-Cross-chain interoperability patterns for Hedera — send and receive General Message Passing (GMP) calls via Axelar, with gas payment, allowlisting, and bridge-agnostic orchestration seams.
+Cross-chain interoperability patterns for Hedera — Axelar GMP and LayerZero V2 OFT bridges, with peer/gas wiring, allowlisting, and bridge-agnostic orchestration seams.
 
 **Skills included:**
 
 - **axelar-gmp** — Axelar Gateway `callContract`, gas service payment, `AxelarExecutable` receivers, Hedera↔EVM wiring, and `IBridgeSender` / handler split (as used by cross-chain DCA orchestration + HSS).
+- **layerzero-messaging** — LayerZero V2 OFT / OApp on Hedera: Endpoint peers, ULN/DVN/executor config, `quoteSend`/`send`, and HTS-backed connector OFTs (mint/burn via `0x167`).
 
 **Use when:**
 
@@ -106,11 +107,15 @@ Cross-chain interoperability patterns for Hedera — send and receive General Me
 - Wiring destination/source addresses after dual-chain deploys
 - Separating bridge transport from destination business logic
 - Combining HSS scheduled execution with Axelar message dispatch
+- Building Hedera↔EVM OFT bridges with LayerZero V2
+- Configuring `setPeer`, send/receive libraries, and enforced options
+- Implementing HTS connector OFTs (burn on send / mint on receive)
 
 **References included:**
 
-- `examples.md` - Sender, receiver, orchestrator, and executor skeletons
+- `examples.md` - Sender, receiver, orchestrator, executor, OFT, and wire skeletons
 - `hedera-axelar.md` - Testnet gateway/gas addresses, Axelar chain names, env vars
+- `hedera-endpoints.md` - LayerZero EIDs, Endpoint V2, ULN, DVN, and executor addresses
 
 ### native-services-js
 
@@ -249,9 +254,12 @@ hedera-skills/
 │   │       └── hss-system-contract/
 │   │           ├── SKILL.md
 │   │           └── references/
-│   ├── cross-chain/          # Cross-chain interoperability (Axelar GMP)
+│   ├── cross-chain/          # Cross-chain interoperability (Axelar, LayerZero)
 │   │   └── skills/
-│   │       └── axelar-gmp/
+│   │       ├── axelar-gmp/
+│   │       │   ├── SKILL.md
+│   │       │   └── references/
+│   │       └── layerzero-messaging/
 │   │           ├── SKILL.md
 │   │           └── references/
 │   ├── native-services-js/   # Hedera native services + x402 payments
