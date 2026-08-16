@@ -13,6 +13,7 @@ A marketplace of plugins and skills for AI coding agents. Includes Hedera-specif
 # Install individual plugins
 /plugin install agent-kit-plugin
 /plugin install system-contracts
+/plugin install oracles
 /plugin install cross-chain
 /plugin install native-services-js
 /plugin install hackathon-helper
@@ -67,7 +68,6 @@ Technical references for Hedera system contracts — the precompiled smart contr
 
 - **hts-system-contract** — Hedera Token Service system contract (`0x167`). Token creation (fungible and NFT), minting, burning, transfers, association model, key system, fees, and compliance features.
 - **hss-system-contract** — Hedera Schedule Service system contract (`0x16b`). Scheduling native HTS token creation, generalized scheduled contract calls, and schedule signing from contracts (HIP-755, HIP-756, HIP-1215).
-- **hedera-oracle-adapters** — Provider-agnostic price oracle adapters on Hedera (Chainlink, Supra, Pyth) behind a shared `IPriceOracle` interface with 18-decimal normalization.
 
 **Use when:**
 
@@ -77,8 +77,6 @@ Technical references for Hedera system contracts — the precompiled smart contr
 - Understanding HTS response codes and error handling
 - Configuring token keys and permissions
 - Working with token fees and compliance features
-- Integrating Chainlink, Supra, or Pyth price feeds on Hedera
-- Building `IPriceOracle` adapters or consumers that convert with `priceE18`
 
 **References included (HTS):**
 
@@ -94,10 +92,27 @@ Technical references for Hedera system contracts — the precompiled smart contr
 
 - `api.md` - HSS contract API reference (Solidity signatures)
 
-**References included (oracle adapters):**
+### oracles
 
-- `examples.md` - Condensed Chainlink / Supra / Pyth adapter and consumer skeletons
-- `hedera-feeds.md` - Hedera testnet/mainnet feed addresses, Supra pair IDs, Pyth price IDs
+Hedera price oracle integrations — one skill per provider, matching the cross-chain plugin layout. Skills stay generic (read/update rules, Hedera quirks, where to source IDs). Project-specific adapter names, deploy runbooks, and feed tables belong in the consuming repo’s `AGENTS.md`.
+
+**Skills included:**
+
+- **chainlink-data-feeds** — AggregatorV3 Data Feeds on Hedera (`latestRoundData` completeness, staleness, decimal normalization). Not CCIP.
+- **supra-push-oracle** — Supra S-Value push (`getSvalue`), millisecond timestamps, and USDT-quoted pairs on Hedera.
+- **pyth-price-feeds** — Pyth pull feeds: Hermes update payloads, payable `updatePriceFeeds`, `getPriceNoOlderThan`, confidence, and signed `expo` normalization.
+
+**Use when:**
+
+- Reading Chainlink Data Feeds on Hedera testnet (`296`) or mainnet (`295`)
+- Integrating Supra push oracles and converting Hedera timestamps to unix seconds
+- Pulling Pyth prices via Hermes updates before on-chain reads
+- Normalizing provider decimals / exponents to a consumer price scale
+
+**References included:**
+
+- `examples.md` - Provider read / update sketches per skill
+- `hedera-feeds.md` - Where to source Hedera feed addresses, Supra pair IDs, and Pyth price IDs
 
 ### cross-chain
 
@@ -259,10 +274,18 @@ hedera-skills/
 │   │       ├── hts-system-contract/
 │   │       │   ├── SKILL.md
 │   │       │   └── references/
-│   │       ├── hss-system-contract/
+│   │       └── hss-system-contract/
+│   │           ├── SKILL.md
+│   │           └── references/
+│   ├── oracles/              # Price oracles (Chainlink, Supra, Pyth)
+│   │   └── skills/
+│   │       ├── chainlink-data-feeds/
 │   │       │   ├── SKILL.md
 │   │       │   └── references/
-│   │       └── hedera-oracle-adapters/
+│   │       ├── supra-push-oracle/
+│   │       │   ├── SKILL.md
+│   │       │   └── references/
+│   │       └── pyth-price-feeds/
 │   │           ├── SKILL.md
 │   │           └── references/
 │   ├── cross-chain/          # Cross-chain interoperability (Axelar, LayerZero)
