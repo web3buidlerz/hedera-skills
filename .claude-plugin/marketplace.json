@@ -31,7 +31,7 @@
     },
     {
       "name": "cross-chain",
-      "description": "Cross-chain interoperability patterns for Hedera — Axelar GMP, LayerZero V2 OFT, and Chainlink CCIP burn-and-mint CCT, with gas/peer/selector wiring to EVM destinations",
+      "description": "Cross-chain interoperability patterns for Hedera — Axelar GMP, LayerZero V2 OFT send/receive, and Chainlink CCIP burn-and-mint CCT, with gas/peer/selector wiring and bridge patterns to EVM destinations",
       "version": "1.0.0",
       "author": {
         "name": "Hedera Dev"
