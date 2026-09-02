@@ -24,8 +24,8 @@ PRD points at that file rather than duplicating it.
 # <Title> (PRD)
 
 ## Goal
-One paragraph: what this feature adds to the app, who it is for, and what
-"done" looks like in a browser without live credentials.
+One paragraph: what the feature is, who it is for, and what "done" looks
+like in a browser.
 
 ## Journeys
 1. **Browse without a wallet** — what the user can see/do read-only.
@@ -53,8 +53,9 @@ Numbered, browser-verifiable assertions live in `.harness/eval.json`
 Keep this document product-facing; keep the checklist test-facing.
 ```
 
-Write about the **delta**: the app already exists and already works. Say what is
-added and what must keep working — not how to rebuild the app.
+The host app already exists. When emitting the PRD, describe the feature the
+user asked for — do not ask the generator to rebuild the scaffold, and do not
+make the user's goal paragraph account for boilerplate routes.
 
 ## Splitting read path vs wallet-gated
 
@@ -66,7 +67,10 @@ Ask: *Can a stranger open the app with no wallet and no `.env` and still see som
 | Affordance | Connect button, "needs wallet" messaging | `walletRequired: true`, still verifiable without credentials |
 | Write / on-chain | Submit HCS message, mint, contract call | Only with CHAIN + `executableWithTestSigner: true` |
 
-Design the PRD so the first journey is always a solid credential-free browse path.
+Recommend a credential-free first journey. If the first visit needs an
+operator key or a funded wallet, ASSERT / SMOKE / EVALUATE have no cheap
+green state and later stages get harder. Do not block a credentials-first
+design — note the cost and proceed if they confirm.
 
 ## Increments — splitting one feature across PRDs
 

@@ -15,9 +15,9 @@ than from this page.
 | Stage | Recipe file fields | What it checks | Host prerequisites |
 |-------|--------------------|----------------|--------------------|
 | **ASSERT** | `validators.static`, `validators.commands`, `requiredFiles`, `forbiddenFiles`, `secretScan` | Files, JSON/text, secrets, install/lint/build | Node ≥ 20, yarn, the agent CLI on PATH |
-| **SMOKE** | `validators.playwright` | Dev server boots; routes reachable and actually rendered; no console errors; no forbidden text | Playwright browser installed |
-| **EVALUATE** | `eval` + `validator.enabled: true` | Agent grades numbered assertions | Playwright MCP usable headless |
-| **CHAIN** | `chainValidation` (+ EVALUATE) | Ephemeral ECDSA test signer; real txs; mirror verify | Funded **ECDSA** testnet operator exported in the shell |
+| **SMOKE** | `validators.playwright` | Dev server boots; routes reachable and actually rendered; no console errors; no forbidden text | `playwright` at the **project root** (`yarn add -D playwright`); browser (project Chromium or system Chrome) |
+| **EVALUATE** | `eval` + `validator.enabled: true` | Agent grades numbered assertions | Playwright MCP usable headless (same browser as SMOKE) |
+| **CHAIN** | `chainValidation` (+ EVALUATE) | Ephemeral ECDSA test signer; real txs; mirror verify | `@hiero-ledger/sdk` at the **project root** (`yarn add -D @hiero-ledger/sdk`); funded **ECDSA** testnet operator exported in the shell |
 
 Pass condition: every enabled **stage** must pass. EVALUATE **infrastructure**
 failures (MCP or browser missing) **abort** the repair loop rather than counting
@@ -127,6 +127,10 @@ chainValidation:
 
 Checklist:
 
+- `@hiero-ledger/sdk` is a **root** devDependency. Scaffold already ships it
+  under `packages/nextjs`, but Yarn `nmHoistingLimits: workspaces` keeps that
+  copy invisible to `hedera-harness` / doctor. Install at the root when you
+  enable this stage — do not wait for doctor to fail.
 - operator is **ECDSA**, not ED25519 — ED25519 has no EVM alias
 - env vars exported in the shell; never written into the workspace
 - the project keeps the burner connector enabled so headless signing works

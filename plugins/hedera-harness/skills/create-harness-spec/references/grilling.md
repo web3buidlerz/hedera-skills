@@ -26,19 +26,29 @@ instead. Either way, apply the harness decision tree below.
   `baseline` commands and static **needles**)
 - Which package manager and workspaces? (the harness detects these; you only
   need them to sanity-check)
-- What existing routes and pages does the app already ship?
+- What existing routes and pages does the app already ship? Absorb these
+  when writing files. Do not quiz the user about them or ask them to phrase
+  the feature around the scaffold.
 - Which agent CLI is on PATH? (`claude` vs `agent`) — this picks the preset
 
 5. Do **not** write files until the user confirms shared understanding.
+
+The host is a scaffolded app. That is an authoring fact, not a grilling
+topic. Do **not** tell the user to phrase the idea as a "delta", and do not
+list boilerplate routes (`/`, `/debug`, `/blockexplorer`) as something they
+must keep working. They describe the feature; you keep the host intact when
+you emit the PRD.
 
 ## Decision tree (dependency order)
 
 Walk these decisions in order. Later choices depend on earlier answers.
 
 1. **Product goal** — one paragraph: what the feature is, who it is for, and
-   what "done" looks like in a browser without live credentials.
-   *Recommend:* keep the first journey credential-free. Phrase the goal as a
-   **delta** against the existing app — what stays, what is added.
+   what "done" looks like in a browser.
+   *Recommend:* a first journey that works with no operator key, `.env`, or
+   funded wallet. If the first thing a visitor sees needs credentials, the
+   run has no cheap green state and later stages get harder to pass. Note
+   that cost, then accept whatever they choose — recommend, don't require.
 
 2. **Slug** — kebab-case name for the **recipe file** `name` field.
    *Recommend:* short product noun (`proof-wall`, `x402-pay-to-post`).
@@ -63,6 +73,8 @@ Walk these decisions in order. Later choices depend on earlier answers.
    - Real on-chain writes must be graded → CHAIN +
      `executableWithTestSigner` become meaningful (still opt-in; confirm
      explicitly, and confirm the user has a funded **ECDSA** testnet operator).
+     Enabling CHAIN also means installing `@hiero-ledger/sdk` at the project
+     root when you emit (`yarn add -D @hiero-ledger/sdk`).
 
 7. **One PRD or increments?** — can one agent session land this?
    *Recommend:* **one PRD**. Split into ordered **increments** only when the
@@ -76,7 +88,9 @@ Walk these decisions in order. Later choices depend on earlier answers.
 
 9. **Stage ambition for the first green run** — default **ASSERT only**.
    Offer SMOKE / EVALUATE / CHAIN only after the user opts in. Ambition decides
-   which files get written vs left as commented stubs.
+   which files get written vs left as commented stubs. If they opt in, install
+   the matching root dep when emitting (SMOKE → `playwright`; CHAIN →
+   `@hiero-ledger/sdk`) so `doctor` is a check, not an install prompt.
 
 10. **Confirm shared understanding** — summarize the decisions (slug, services,
     routes, Solidity, increments, agent, stages). Wait for an explicit
@@ -95,3 +109,6 @@ Walk these decisions in order. Later choices depend on earlier answers.
 - **Marking assertions `executableWithTestSigner` "for later."** They are inert
   without CHAIN and give a false sense of coverage.
 - **Putting acceptance detail in the PRD.** That breaks the **blind** rule.
+- **Enabling CHAIN (or SMOKE) without a root install.** A copy of
+  `@hiero-ledger/sdk` inside `packages/nextjs` does not satisfy doctor.
+  Install at the project root as part of emit.
