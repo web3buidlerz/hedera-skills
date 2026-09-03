@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "hedera-skills",
-  "description": "Official Hedera marketplace for AI coding agent plugins - Agent Kit development, system contracts, native services (JS SDK), hackathon tooling, harness authoring, and dev workflow intelligence",
+  "description": "Official Hedera marketplace for AI coding agent plugins - Agent Kit development, system contracts, oracles, native services (JS SDK), hackathon tooling, harness authoring, and dev workflow intelligence",
   "owner": {
     "name": "Hedera Dev",
     "url": "https://hedera.com"
@@ -28,6 +28,17 @@
       "source": "./plugins/system-contracts",
       "category": "development",
       "keywords": ["hedera", "hts", "hss", "tokens", "solidity", "smart-contracts", "schedule-service"]
+    },
+    {
+      "name": "oracles",
+      "description": "Hedera price oracle integrations — Chainlink Data Feeds, Supra S-Value push, and Pyth pull feeds on testnet 296 / mainnet 295",
+      "version": "1.0.0",
+      "author": {
+        "name": "Hedera Dev"
+      },
+      "source": "./plugins/oracles",
+      "category": "development",
+      "keywords": ["hedera", "oracle", "chainlink", "data-feeds", "supra", "pyth", "price-feeds", "solidity"]
     },
     {
       "name": "cross-chain",
