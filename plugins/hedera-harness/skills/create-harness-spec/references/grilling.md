@@ -73,8 +73,8 @@ Walk these decisions in order. Later choices depend on earlier answers.
    - Real on-chain writes must be graded → CHAIN +
      `executableWithTestSigner` become meaningful (still opt-in; confirm
      explicitly, and confirm the user has a funded **ECDSA** testnet operator).
-     Enabling CHAIN also means installing `@hiero-ledger/sdk` at the project
-     root when you emit (`yarn add -D @hiero-ledger/sdk`).
+     CHAIN uses `@hiero-ledger/sdk` bundled with `hedera-harness` — do not
+     `yarn add` it into the project.
 
 7. **One PRD or increments?** — can one agent session land this?
    *Recommend:* **one PRD**. Split into ordered **increments** only when the
@@ -88,9 +88,9 @@ Walk these decisions in order. Later choices depend on earlier answers.
 
 9. **Stage ambition for the first green run** — default **ASSERT only**.
    Offer SMOKE / EVALUATE / CHAIN only after the user opts in. Ambition decides
-   which files get written vs left as commented stubs. If they opt in, install
-   the matching root dep when emitting (SMOKE → `playwright`; CHAIN →
-   `@hiero-ledger/sdk`) so `doctor` is a check, not an install prompt.
+   which files get written vs left as commented stubs. If they opt in to SMOKE,
+   install `playwright` at the project root when emitting so `doctor` is a
+   check, not an install prompt. CHAIN needs no extra package.
 
 10. **Confirm shared understanding** — summarize the decisions (slug, services,
     routes, Solidity, increments, agent, stages). Wait for an explicit
@@ -109,6 +109,6 @@ Walk these decisions in order. Later choices depend on earlier answers.
 - **Marking assertions `executableWithTestSigner` "for later."** They are inert
   without CHAIN and give a false sense of coverage.
 - **Putting acceptance detail in the PRD.** That breaks the **blind** rule.
-- **Enabling CHAIN (or SMOKE) without a root install.** A copy of
-  `@hiero-ledger/sdk` inside `packages/nextjs` does not satisfy doctor.
-  Install at the project root as part of emit.
+- **Enabling SMOKE without a root `playwright` install.** A copy inside
+  `packages/nextjs` does not satisfy doctor. Install at the project root as
+  part of emit. CHAIN does not need a project SDK install.

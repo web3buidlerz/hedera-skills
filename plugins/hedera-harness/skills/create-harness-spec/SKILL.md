@@ -70,14 +70,15 @@ Then:
 5. Add SMOKE / EVALUATE / CHAIN only if the user opted in during the grill —
    see `harness-spec-anatomy` → [references/stage-strategy.md](../harness-spec-anatomy/references/stage-strategy.md).
    If `prd:` is a list and EVALUATE is on, write a matching `eval:` list.
-6. Install host packages for the stages you just enabled — at the **project
-   root**, not only inside a workspace. Doctor imports them from next to
-   `hedera-harness`, and Yarn `nmHoistingLimits: workspaces` hides
+6. Install the SMOKE host package if you just enabled it — at the **project
+   root**, not only inside a workspace. Doctor imports `playwright` from next
+   to `hedera-harness`, and Yarn `nmHoistingLimits: workspaces` hides
    `packages/nextjs` installs.
    - SMOKE → `yarn add -D playwright` (or npm/pnpm equivalent)
-   - CHAIN → `yarn add -D @hiero-ledger/sdk`
    Skip the add if the root `package.json` already lists it. Do this as part
    of emit, not as a follow-up after `doctor` fails.
+   CHAIN does **not** need a project install: `@hiero-ledger/sdk` ships with
+   `hedera-harness`. Only the operator env vars are host-provided.
 
 Reconstruct bodies by hand only when the skeleton is unavailable:
 `harness-spec-anatomy` → [references/spec-files.md](../harness-spec-anatomy/references/spec-files.md).
